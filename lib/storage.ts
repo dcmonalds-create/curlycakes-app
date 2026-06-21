@@ -34,11 +34,19 @@ function cloudStorage(): CloudStorage | null {
   return wa.CloudStorage as CloudStorage;
 }
 
+// Telegram CloudStorage key constraint: only [A-Za-z0-9_-], length 1–128.
+// Our local keys use colons (cc:lists). Replace at the boundary.
+function safeKey(k: string): string {
+  return k.replace(/[^A-Za-z0-9_-]/g, "_");
+}
+
 // Chunked write to CloudStorage: split value into parts of CHUNK_SIZE.
-// Index is stored at `<key>` with format `n:<count>`. Parts at `<key>:0`, `<key>:1`, ...
+// Index is stored at `<key>` with format `n:<count>` (value is unrestricted, only the key needs sanitizing).
+// Parts at `<key>_0`, `<key>_1`, ...
 async function cloudWrite(key: string, value: string): Promise<void> {
   const cs = cloudStorage();
   if (!cs) throw new Error("CloudStorage not available");
+  const base = safeKey(key);
   const parts: string[] = [];
   for (let i = 0; i < value.length; i += CHUNK_SIZE) {
     parts.push(value.slice(i, i + CHUNK_SIZE));
@@ -46,11 +54,11 @@ async function cloudWrite(key: string, value: string): Promise<void> {
   if (parts.length > MAX_CHUNKS) throw new Error(`Data too large (${value.length} bytes)`);
 
   const writes: Promise<void>[] = [];
-  writes.push(setItemP(cs, key, `n:${parts.length}`));
-  parts.forEach((part, i) => writes.push(setItemP(cs, `${key}:${i}`, part)));
+  writes.push(setItemP(cs, base, `n:${parts.length}`));
+  parts.forEach((part, i) => writes.push(setItemP(cs, `${base}_${i}`, part)));
   // Best-effort: remove leftover chunks from a previous larger value
   for (let i = parts.length; i < MAX_CHUNKS; i++) {
-    writes.push(removeItemP(cs, `${key}:${i}`).catch(() => undefined));
+    writes.push(removeItemP(cs, `${base}_${i}`).catch(() => undefined));
   }
   await Promise.all(writes);
 }
@@ -58,7 +66,8 @@ async function cloudWrite(key: string, value: string): Promise<void> {
 async function cloudRead(key: string): Promise<string | null> {
   const cs = cloudStorage();
   if (!cs) throw new Error("CloudStorage not available");
-  const meta = await getItemP(cs, key);
+  const base = safeKey(key);
+  const meta = await getItemP(cs, base);
   if (!meta) return null;
   const match = meta.match(/^n:(\d+)$/);
   if (!match) {
@@ -67,7 +76,7 @@ async function cloudRead(key: string): Promise<string | null> {
   }
   const count = Number(match[1]);
   if (!count) return "";
-  const keys = Array.from({ length: count }, (_, i) => `${key}:${i}`);
+  const keys = Array.from({ length: count }, (_, i) => `${base}_${i}`);
   const values = await getItemsP(cs, keys);
   return keys.map((k) => values[k] ?? "").join("");
 }
