@@ -7,7 +7,9 @@ interface TgWebApp {
   switchInlineQuery?: (q: string, targets?: string[]) => void;
   openTelegramLink?: (url: string) => void;
   showAlert?: (msg: string) => void;
+  showPopup?: (params: { title?: string; message: string; buttons?: { id?: string; type?: string; text?: string }[] }, cb?: (id: string) => void) => void;
   themeParams?: Record<string, string>;
+  initData?: string;
 }
 
 export function tg(): TgWebApp | null {
@@ -16,15 +18,38 @@ export function tg(): TgWebApp | null {
   return window.Telegram?.WebApp ?? null;
 }
 
-export function shareViaTelegram(text: string) {
+export function isInsideTelegram(): boolean {
   const t = tg();
+  return !!(t && t.initData !== undefined);
+}
+
+export type ShareResult = "telegram-inline" | "telegram-link" | "browser-tab" | "copied" | "empty";
+
+export async function shareViaTelegram(text: string): Promise<ShareResult> {
+  if (!text || !text.trim()) return "empty";
+
+  const t = tg();
+  // Inside Telegram: use the native share dialog (works even without inline mode on the bot)
+  if (t?.openTelegramLink) {
+    const url = `https://t.me/share/url?url=${encodeURIComponent(" ")}&text=${encodeURIComponent(text)}`;
+    t.openTelegramLink(url);
+    // Also copy as a safety net so user can paste anywhere
+    await copyText(text);
+    return "telegram-link";
+  }
+  // Inline mode (if bot supports it)
   if (t?.switchInlineQuery) {
     t.switchInlineQuery(text, ["users", "groups"]);
-    return;
+    return "telegram-inline";
   }
-  // Fallback: open share URL in a new tab
-  const url = `https://t.me/share/url?url=${encodeURIComponent(" ")}&text=${encodeURIComponent(text)}`;
-  if (typeof window !== "undefined") window.open(url, "_blank");
+  // Browser fallback: copy to clipboard + open share URL
+  const copied = await copyText(text);
+  if (typeof window !== "undefined") {
+    const url = `https://t.me/share/url?url=${encodeURIComponent(" ")}&text=${encodeURIComponent(text)}`;
+    // Use location.href instead of window.open — not popup-blocked
+    try { window.open(url, "_blank") || (window.location.href = url); } catch { window.location.href = url; }
+  }
+  return copied ? "browser-tab" : "browser-tab";
 }
 
 export async function copyText(text: string) {

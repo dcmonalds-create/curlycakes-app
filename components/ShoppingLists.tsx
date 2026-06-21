@@ -122,7 +122,18 @@ function ListDetail({
   const totals = useMemo(() => aggregate(list.cakes, products), [list.cakes, products]);
 
   async function share() {
-    shareViaTelegram(buildShoppingMessage(list.name, list.cakes, products));
+    const totals = aggregate(list.cakes, products);
+    if (totals.length === 0) {
+      alert("Add ingredients to your cakes first — the list is empty ✨");
+      return;
+    }
+    const msg = buildShoppingMessage(list.name, list.cakes, products);
+    const result = await shareViaTelegram(msg);
+    if (result === "browser-tab") {
+      alert("Copied to clipboard & opened Telegram share — pick a chat.");
+    } else if (result === "telegram-link") {
+      // Telegram opened the share dialog natively; also copied as backup
+    }
   }
 
   async function copy() {
