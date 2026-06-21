@@ -1,15 +1,25 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useLocalState, uid } from "@/lib/storage";
-import { UNITS, type Recipe, type Ingredient, type Unit, type ShoppingList } from "@/lib/types";
+import { UNITS, type Recipe, type Ingredient, type Unit, type ShoppingList, type Product } from "@/lib/types";
+import { normalizeName } from "@/lib/aggregate";
+import { PackEditor } from "@/components/PackEditor";
 
 const DEFAULT_CATEGORIES = ["Sponge", "Cream", "Frosting", "Decoration", "Dough", "Other"];
 
 export function Recipes() {
   const [recipes, setRecipes] = useLocalState<Recipe[]>("cc:recipes", []);
   const [lists, setLists] = useLocalState<ShoppingList[]>("cc:lists", []);
+  const [products, setProducts] = useLocalState<Product[]>("cc:products", []);
   const [filter, setFilter] = useState<string>("All");
   const [openId, setOpenId] = useState<string | null>(null);
+
+  function upsertProduct(p: Product) {
+    setProducts([...products.filter((x) => x.name !== p.name), p]);
+  }
+  function removeProduct(name: string) {
+    setProducts(products.filter((p) => p.name !== name));
+  }
 
   const categories = useMemo(() => {
     const fromRecipes = recipes.map((r) => r.category).filter(Boolean);
@@ -68,10 +78,13 @@ export function Recipes() {
       <RecipeDetail
         recipe={open}
         lists={lists}
+        products={products}
         onBack={() => setOpenId(null)}
         onChange={update}
         onDelete={() => remove(open.id)}
         onAddToList={(p, lid, ln) => addToList(open, p, lid, ln)}
+        onUpsertProduct={upsertProduct}
+        onRemoveProduct={removeProduct}
         categories={categories}
       />
     );
@@ -124,23 +137,32 @@ export function Recipes() {
 function RecipeDetail({
   recipe,
   lists,
+  products,
   onBack,
   onChange,
   onDelete,
   onAddToList,
+  onUpsertProduct,
+  onRemoveProduct,
   categories,
 }: {
   recipe: Recipe;
   lists: ShoppingList[];
+  products: Product[];
   onBack: () => void;
   onChange: (r: Recipe) => void;
   onDelete: () => void;
   onAddToList: (portions: number, listId: string | "__new__", newListName?: string) => boolean;
+  onUpsertProduct: (p: Product) => void;
+  onRemoveProduct: (name: string) => void;
   categories: string[];
 }) {
   const ingredients = recipe.ingredients ?? [];
   const [draft, setDraft] = useState<{ name: string; qty: string; unit: Unit }>({ name: "", qty: "", unit: "g" });
   const [showAdder, setShowAdder] = useState<boolean>(false);
+  const [packEditFor, setPackEditFor] = useState<string | null>(null);
+
+  const productByName = (n: string) => products.find((p) => p.name === normalizeName(n));
 
   function setIngredients(next: Ingredient[]) {
     onChange({ ...recipe, ingredients: next });
@@ -191,32 +213,53 @@ function RecipeDetail({
         </div>
 
         <ul className="space-y-2">
-          {ingredients.map((i) => (
-            <li key={i.id} className="space-y-1">
-              <input
-                className="input"
-                value={i.name}
-                onChange={(e) => updateIng(i.id, { name: e.target.value })}
-              />
-              <div className="flex gap-2 items-center">
+          {ingredients.map((i) => {
+            const product = productByName(i.name);
+            return (
+              <li key={i.id} className="space-y-1">
                 <input
-                  className="input flex-1 text-right"
-                  type="number"
-                  inputMode="decimal"
-                  value={i.qty}
-                  onChange={(e) => updateIng(i.id, { qty: Number(e.target.value) })}
+                  className="input"
+                  value={i.name}
+                  onChange={(e) => updateIng(i.id, { name: e.target.value })}
                 />
-                <select
-                  className="input flex-1"
-                  value={i.unit}
-                  onChange={(e) => updateIng(i.id, { unit: e.target.value as Unit })}
-                >
-                  {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-                </select>
-                <button onClick={() => removeIng(i.id)} className="shrink-0 text-rose-300 px-1">✕</button>
-              </div>
-            </li>
-          ))}
+                <div className="flex gap-2 items-center">
+                  <input
+                    className="input flex-1 text-right"
+                    type="number"
+                    inputMode="decimal"
+                    value={i.qty === 0 ? "" : i.qty}
+                    onChange={(e) => updateIng(i.id, { qty: e.target.value === "" ? 0 : Number(e.target.value) })}
+                  />
+                  <select
+                    className="input flex-1"
+                    value={i.unit}
+                    onChange={(e) => updateIng(i.id, { unit: e.target.value as Unit })}
+                  >
+                    {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                  <button
+                    onClick={() => setPackEditFor(packEditFor === i.id ? null : i.id)}
+                    className={`shrink-0 px-2 text-lg ${product ? "text-rose-500" : "text-rose-200"}`}
+                    title={product ? `${product.packSize} ${product.packUnit} per ${product.packLabelSingular}` : "Set pack size"}
+                  >📦</button>
+                  <button onClick={() => removeIng(i.id)} className="shrink-0 text-rose-300 px-1">✕</button>
+                </div>
+                {packEditFor === i.id && (
+                  <PackEditor
+                    ingredientName={i.name}
+                    existing={product}
+                    defaultUnit={i.unit}
+                    onSave={(p) => { onUpsertProduct(p); setPackEditFor(null); }}
+                    onClear={product ? () => { onRemoveProduct(product.name); setPackEditFor(null); } : undefined}
+                    onCancel={() => setPackEditFor(null)}
+                  />
+                )}
+                {product && packEditFor !== i.id && (
+                  <p className="text-[11px] text-rose-400 pl-1">📦 {product.packSize} {product.packUnit} per {product.packLabelSingular}</p>
+                )}
+              </li>
+            );
+          })}
         </ul>
 
         <div className="pt-2 border-t border-rose-50 space-y-2">

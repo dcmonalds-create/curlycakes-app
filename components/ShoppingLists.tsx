@@ -4,6 +4,7 @@ import { useLocalState, uid } from "@/lib/storage";
 import { UNITS, type ShoppingList, type Unit, type Ingredient, type Product } from "@/lib/types";
 import { aggregate, buildShoppingMessage, normalizeName } from "@/lib/aggregate";
 import { shareViaTelegram, copyText } from "@/lib/telegram";
+import { PackEditor } from "@/components/PackEditor";
 
 export function ShoppingLists() {
   const [lists, setLists] = useLocalState<ShoppingList[]>("cc:lists", []);
@@ -192,7 +193,12 @@ function ListDetail({
                       <span className="text-rose-300">({t.pack.packSize} {t.pack.packUnit} each)</span>
                     </div>
                   )}
-                  {!t.pack && (
+                  {t.unitMismatch && (
+                    <div className="text-[11px] text-red-500 text-right mt-0.5">
+                      ⚠ Pack saved in <b>{t.unitMismatch.packUnit}</b> but ingredient is in <b>{t.unitMismatch.ingredientUnit}</b> — re-open 📦 and match units
+                    </div>
+                  )}
+                  {!t.pack && !t.unitMismatch && (
                     <div className="text-xs text-rose-300 text-right mt-0.5">📦 tap ingredient to set pack size</div>
                   )}
                 </li>
@@ -268,8 +274,8 @@ function CakeCard({
                   className="input flex-1 text-right"
                   type="number"
                   inputMode="decimal"
-                  value={i.qty}
-                  onChange={(e) => update(i.id, { qty: Number(e.target.value) })}
+                  value={i.qty === 0 ? "" : i.qty}
+                  onChange={(e) => update(i.id, { qty: e.target.value === "" ? 0 : Number(e.target.value) })}
                 />
                 <select className="input flex-1" value={i.unit} onChange={(e) => update(i.id, { unit: e.target.value as Unit })}>
                   {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
@@ -320,141 +326,3 @@ function CakeCard({
   );
 }
 
-const PRESETS: { singular: string; plural: string; icon: string }[] = [
-  { singular: "bottle", plural: "bottles", icon: "🍶" },
-  { singular: "pack",   plural: "packs",   icon: "📦" },
-  { singular: "tray",   plural: "trays",   icon: "🥚" },
-  { singular: "bar",    plural: "bars",    icon: "🍫" },
-  { singular: "box",    plural: "boxes",   icon: "🎁" },
-  { singular: "bag",    plural: "bags",    icon: "🛍️" },
-  { singular: "can",    plural: "cans",    icon: "🥫" },
-];
-
-function defaultLabelFor(unit: Unit): { singular: string; plural: string } {
-  if (unit === "l" || unit === "ml") return { singular: "bottle", plural: "bottles" };
-  if (unit === "pcs") return { singular: "tray", plural: "trays" };
-  return { singular: "pack", plural: "packs" }; // g, kg
-}
-
-function PackEditor({
-  ingredientName,
-  existing,
-  defaultUnit,
-  onSave,
-  onClear,
-  onCancel,
-}: {
-  ingredientName: string;
-  existing?: Product;
-  defaultUnit: Unit;
-  onSave: (p: Product) => void;
-  onClear?: () => void;
-  onCancel: () => void;
-}) {
-  const initUnit = existing?.packUnit ?? defaultUnit;
-  const initLabels = existing
-    ? { singular: existing.packLabelSingular, plural: existing.packLabelPlural }
-    : defaultLabelFor(initUnit);
-
-  const [size, setSize] = useState<string>(existing?.packSize?.toString() ?? "");
-  const [unit, setUnit] = useState<Unit>(initUnit);
-  const [singular, setSingular] = useState<string>(initLabels.singular);
-  const [plural, setPlural] = useState<string>(initLabels.plural);
-  const [showPlural, setShowPlural] = useState<boolean>(false);
-
-  function pickPreset(p: { singular: string; plural: string }) {
-    setSingular(p.singular);
-    setPlural(p.plural);
-  }
-
-  function changeUnit(u: Unit) {
-    setUnit(u);
-    // Only auto-adjust labels if user hasn't customized them
-    const matchedPreset = PRESETS.find((p) => p.singular === singular && p.plural === plural);
-    if (matchedPreset || (!existing && !showPlural)) {
-      const d = defaultLabelFor(u);
-      setSingular(d.singular);
-      setPlural(d.plural);
-    }
-  }
-
-  function save() {
-    const n = Number(size);
-    const s = singular.trim();
-    if (!n || n <= 0 || !s) return;
-    const pl = plural.trim() || s; // safe fallback — never empty
-    onSave({
-      name: normalizeName(ingredientName),
-      displayName: ingredientName.trim(),
-      packSize: n,
-      packUnit: unit,
-      packLabelSingular: s,
-      packLabelPlural: pl,
-    });
-  }
-
-  return (
-    <div className="bg-rose-50 rounded-2xl p-3 space-y-3 border border-rose-100">
-      <p className="text-xs text-rose-600 font-semibold">📦 Package for "{ingredientName}"</p>
-
-      <div className="flex gap-2 items-center">
-        <input
-          className="input w-20 text-right"
-          placeholder="Size"
-          type="number"
-          inputMode="decimal"
-          value={size}
-          onChange={(e) => setSize(e.target.value)}
-        />
-        <select className="input w-20" value={unit} onChange={(e) => changeUnit(e.target.value as Unit)}>
-          {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-        </select>
-        <span className="text-xs text-rose-500 shrink-0">per</span>
-        <input
-          className="input flex-1"
-          placeholder="pack"
-          value={singular}
-          onChange={(e) => setSingular(e.target.value)}
-        />
-      </div>
-
-      <div className="flex flex-wrap gap-1">
-        {PRESETS.map((p) => (
-          <button
-            key={p.singular}
-            type="button"
-            onClick={() => pickPreset(p)}
-            className={`text-xs px-2 py-1 rounded-full border transition ${
-              singular === p.singular && plural === p.plural
-                ? "bg-rose-500 text-white border-rose-500"
-                : "bg-white text-rose-500 border-rose-200"
-            }`}
-          >
-            {p.icon} {p.singular}
-          </button>
-        ))}
-      </div>
-
-      {!showPlural ? (
-        <button type="button" onClick={() => setShowPlural(true)} className="text-[11px] text-rose-400 underline">
-          Edit plural form ("{plural}")
-        </button>
-      ) : (
-        <input
-          className="input"
-          placeholder="Plural (e.g. bottles)"
-          value={plural}
-          onChange={(e) => setPlural(e.target.value)}
-        />
-      )}
-
-      <p className="text-[11px] text-rose-400">e.g. Milk = 2 L per bottle  •  Eggs = 10 pcs per tray  •  Sugar = 1 kg per pack</p>
-
-      <div className="flex gap-2">
-        <button onClick={save} className="btn-primary flex-1 text-sm">Save</button>
-        {onClear && <button onClick={onClear} className="btn-ghost text-sm">Remove</button>}
-        <button onClick={onCancel} className="btn-ghost text-sm">Cancel</button>
-      </div>
-    </div>
-  );
-}

@@ -24,6 +24,8 @@ export interface AggregatedLine {
     packSize: number;       // 2
     packUnit: Unit;         // "l"
   };
+  /** Set when a product is configured but its pack unit family doesn't match the ingredient (e.g. pack in g, ingredient in ml). */
+  unitMismatch?: { packUnit: Unit; ingredientUnit: Unit };
 }
 
 function roundQty(q: number) {
@@ -55,6 +57,7 @@ export function aggregate(cakes: Cake[], products: Product[] = []): AggregatedLi
     else qty = roundQty(qty);
 
     let pack: AggregatedLine["pack"];
+    let unitMismatch: AggregatedLine["unitMismatch"];
     const product = productMap.get(nameKey);
     if (product && product.packSize > 0) {
       const packFamily = FAMILY[product.packUnit];
@@ -67,10 +70,12 @@ export function aggregate(cakes: Cake[], products: Product[] = []): AggregatedLi
           packSize: product.packSize,
           packUnit: product.packUnit,
         };
+      } else {
+        unitMismatch = { packUnit: product.packUnit, ingredientUnit: b.baseUnit };
       }
     }
 
-    out.push({ name: b.name, qty, unit, pack });
+    out.push({ name: b.name, qty, unit, pack, unitMismatch });
   }
   out.sort((a, b) => a.name.localeCompare(b.name));
   return out;
@@ -92,6 +97,8 @@ export function buildShoppingMessage(listName: string, cakes: Cake[], products: 
   for (const line of aggregate(cakes, products)) {
     if (line.pack) {
       lines.push(`  ✔️ ${line.name} — ${line.qty} ${line.unit}  →  *${line.pack.count} ${line.pack.label}* (${line.pack.packSize} ${line.pack.packUnit} each)`);
+    } else if (line.unitMismatch) {
+      lines.push(`  ✔️ ${line.name} — ${line.qty} ${line.unit}  ⚠ pack in ${line.unitMismatch.packUnit}, can't convert`);
     } else {
       lines.push(`  ✔️ ${line.name} — ${line.qty} ${line.unit}`);
     }
