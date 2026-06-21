@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;700&display=swap");
+
+:root {
+  --tg-bg: #fff8f4;
+  --tg-text: #4a1f33;
+}
+
+html, body {
+  background: linear-gradient(180deg, #fff1f4 0%, #ffffff 60%, #fff8f4 100%);
+  color: var(--tg-text);
+  min-height: 100vh;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-primary {
+  @apply bg-rose-500 text-white font-semibold rounded-2xl px-5 py-3 shadow-soft active:scale-[0.98] transition;
+}
+.btn-ghost {
+  @apply bg-white/70 backdrop-blur text-rose-700 font-medium rounded-2xl px-4 py-2 border border-rose-100 active:scale-[0.98] transition;
+}
+.card {
+  @apply bg-white/80 backdrop-blur rounded-3xl p-4 shadow-soft border border-rose-100;
+}
+.input {
+  @apply w-full min-w-0 bg-white/90 rounded-xl px-3 py-2 border border-rose-100 focus:border-rose-400 focus:outline-none text-rose-900 placeholder:text-rose-300;
+}
+.chip {
+  @apply px-3 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700;
+}
