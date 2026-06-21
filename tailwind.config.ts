@@ -2,27 +2,37 @@ import type { Config } from "tailwindcss";
 
 const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
-        cream: "#FFF8F4",
-        rose: {
-          50: "#FFF1F4",
-          100: "#FFE0E7",
-          200: "#FFC4D2",
-          300: "#FF9DB6",
-          400: "#FF7197",
-          500: "#F54B7E",
-          600: "#D93268",
-          700: "#A91F4F",
+        bg:     "rgb(var(--bg) / <alpha-value>)",
+        ink:    "rgb(var(--ink) / <alpha-value>)",
+        muted:  "rgb(var(--muted) / <alpha-value>)",
+        subtle: "rgb(var(--subtle) / <alpha-value>)",
+        line:   "rgb(var(--line) / <alpha-value>)",
+        warn:   "rgb(var(--warn) / <alpha-value>)",
+        good:   "rgb(var(--good) / <alpha-value>)",
+        surface: {
+          DEFAULT: "rgb(var(--surface) / <alpha-value>)",
+          "2":     "rgb(var(--surface-2) / <alpha-value>)",
+        },
+        accent: {
+          DEFAULT: "rgb(var(--accent) / <alpha-value>)",
+          "2":     "rgb(var(--accent-2) / <alpha-value>)",
         },
       },
       fontFamily: {
-        display: ["'Playfair Display'", "serif"],
-        sans: ["'Inter'", "system-ui", "sans-serif"],
+        display: ["'Fraunces'", "'DM Serif Display'", "Georgia", "serif"],
+        sans:    ["'Manrope'", "'SF Pro Text'", "system-ui", "sans-serif"],
+        mono:    ["'JetBrains Mono'", "ui-monospace", "monospace"],
       },
       boxShadow: {
-        soft: "0 8px 24px -8px rgba(245, 75, 126, 0.25)",
+        card: "0 1px 0 rgb(var(--line) / 1), 0 12px 32px -16px rgb(var(--ink) / 0.18)",
+        pop:  "0 24px 60px -24px rgb(var(--ink) / 0.35)",
+      },
+      borderRadius: {
+        xl2: "1.25rem",
       },
     },
   },

@@ -2,32 +2,106 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&display=swap");
 
-:root {
-  --tg-bg: #fff8f4;
-  --tg-text: #4a1f33;
+/* ---- Theme tokens ----------------------------------------------------- */
+:root, .theme-light {
+  --bg:        251 247 244;       /* warm cream */
+  --surface:   255 252 250;
+  --surface-2: 247 240 235;
+  --ink:        26  15  24;       /* near-black aubergine */
+  --muted:     105  82  98;
+  --subtle:    170 148 161;
+  --line:      232 222 226;
+  --accent:    179  34  77;       /* deep rose */
+  --accent-2:  219 100 144;
+  --warn:      199  84  44;
+  --good:      105 132  82;
+}
+.theme-dark {
+  --bg:         24  16  21;       /* aubergine */
+  --surface:    34  23  31;
+  --surface-2:  44  30  39;
+  --ink:       246 233 238;
+  --muted:     188 165 175;
+  --subtle:    122  99 110;
+  --line:       64  43  56;
+  --accent:    255 137 178;       /* soft rose for dark */
+  --accent-2:  255 196 215;
+  --warn:      255 167 122;
+  --good:      178 211 144;
 }
 
+/* ---- Base ------------------------------------------------------------- */
 html, body {
-  background: linear-gradient(180deg, #fff1f4 0%, #ffffff 60%, #fff8f4 100%);
-  color: var(--tg-text);
+  background: rgb(var(--bg));
+  color: rgb(var(--ink));
   min-height: 100vh;
+  min-height: 100dvh;
   -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-.btn-primary {
-  @apply bg-rose-500 text-white font-semibold rounded-2xl px-5 py-3 shadow-soft active:scale-[0.98] transition;
+body {
+  /* Subtle "icing" — a hairline halo behind everything */
+  background-image:
+    radial-gradient(80% 50% at 50% -10%, rgb(var(--accent) / 0.10), transparent 60%),
+    radial-gradient(60% 40% at 90% 110%, rgb(var(--accent-2) / 0.08), transparent 60%);
+  background-attachment: fixed;
 }
-.btn-ghost {
-  @apply bg-white/70 backdrop-blur text-rose-700 font-medium rounded-2xl px-4 py-2 border border-rose-100 active:scale-[0.98] transition;
+
+::selection { background: rgb(var(--accent) / 0.18); color: rgb(var(--ink)); }
+
+/* ---- Typography ------------------------------------------------------- */
+.font-display {
+  font-feature-settings: "ss01", "ss02", "ss03";
+  letter-spacing: -0.015em;
 }
-.card {
-  @apply bg-white/80 backdrop-blur rounded-3xl p-4 shadow-soft border border-rose-100;
+h1, h2, h3 { letter-spacing: -0.015em; }
+
+/* ---- Components ------------------------------------------------------- */
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 bg-ink text-bg font-semibold rounded-full px-5 py-3 transition active:scale-[0.985];
+    box-shadow: 0 1px 0 rgb(var(--ink) / 1), 0 12px 28px -14px rgb(var(--ink) / 0.5);
+  }
+  .btn-primary:hover { background: rgb(var(--accent)); color: rgb(var(--bg)); }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 bg-surface text-ink font-medium rounded-full px-4 py-2 border border-line transition active:scale-[0.985];
+  }
+  .btn-accent {
+    @apply inline-flex items-center justify-center gap-2 bg-accent text-bg font-semibold rounded-full px-5 py-3 transition active:scale-[0.985];
+    box-shadow: 0 10px 24px -10px rgb(var(--accent) / 0.6);
+  }
+  .card {
+    @apply bg-surface rounded-xl2 p-4 border border-line shadow-card;
+  }
+  .input {
+    @apply w-full min-w-0 bg-surface text-ink rounded-xl px-3.5 py-3 border border-line
+           focus:border-accent focus:outline-none placeholder:text-subtle;
+    /* iOS Safari zooms when input font-size < 16px on focus — pin it. */
+    font-size: 16px;
+    line-height: 1.25;
+  }
+  .input::-webkit-outer-spin-button,
+  .input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .chip {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide
+           bg-surface-2 text-muted border border-line uppercase;
+  }
+  .divider { @apply h-px bg-line; }
 }
-.input {
-  @apply w-full min-w-0 bg-white/90 rounded-xl px-3 py-2 border border-rose-100 focus:border-rose-400 focus:outline-none text-rose-900 placeholder:text-rose-300;
+
+/* ---- Tab bar / safe area --------------------------------------------- */
+.safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 0.75rem); }
+
+/* ---- Subtle stagger reveal on mount ---------------------------------- */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-.chip {
-  @apply px-3 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700;
-}
+.rise { animation: rise 480ms cubic-bezier(.2,.7,.2,1) both; }
+.rise-1 { animation-delay: 40ms; }
+.rise-2 { animation-delay: 90ms; }
+.rise-3 { animation-delay: 140ms; }

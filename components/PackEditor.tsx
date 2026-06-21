@@ -76,8 +76,8 @@ export function PackEditor({
   }
 
   return (
-    <div className="bg-rose-50 rounded-2xl p-3 space-y-3 border border-rose-100">
-      <p className="text-xs text-rose-600 font-semibold">📦 Package for "{ingredientName}"</p>
+    <div className="bg-surface-2 rounded-2xl p-3 space-y-3 border border-line">
+      <p className="text-xs text-ink font-semibold">📦 Package for "{ingredientName}"</p>
 
       <div className="flex gap-2 items-center">
         <input
@@ -91,7 +91,7 @@ export function PackEditor({
         <select className="input w-20" value={unit} onChange={(e) => changeUnit(e.target.value as Unit)}>
           {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
         </select>
-        <span className="text-xs text-rose-500 shrink-0">per</span>
+        <span className="text-xs text-muted shrink-0">per</span>
         <input
           className="input flex-1"
           placeholder="pack"
@@ -108,8 +108,8 @@ export function PackEditor({
             onClick={() => pickPreset(p)}
             className={`text-xs px-2 py-1 rounded-full border transition ${
               singular === p.singular && plural === p.plural
-                ? "bg-rose-500 text-white border-rose-500"
-                : "bg-white text-rose-500 border-rose-200"
+                ? "bg-accent text-bg border-accent"
+                : "bg-surface text-muted border-line"
             }`}
           >
             {p.icon} {p.singular}
@@ -118,7 +118,7 @@ export function PackEditor({
       </div>
 
       {!showPlural ? (
-        <button type="button" onClick={() => setShowPlural(true)} className="text-[11px] text-rose-400 underline">
+        <button type="button" onClick={() => setShowPlural(true)} className="text-[11px] text-muted underline">
           Edit plural form ("{plural}")
         </button>
       ) : (
@@ -130,7 +130,7 @@ export function PackEditor({
         />
       )}
 
-      <p className="text-[11px] text-rose-400">e.g. Milk = 2 L per bottle  •  Eggs = 10 pcs per tray  •  Sugar = 1 kg per pack</p>
+      <p className="text-[11px] text-muted">e.g. Milk = 2 L per bottle  •  Eggs = 10 pcs per tray  •  Sugar = 1 kg per pack</p>
 
       <div className="flex gap-2">
         <button onClick={save} className="btn-primary flex-1 text-sm">Save</button>

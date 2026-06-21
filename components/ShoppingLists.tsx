@@ -54,30 +54,34 @@ export function ShoppingLists() {
   }
 
   return (
-    <div className="px-5 space-y-4">
-      <button onClick={addList} className="btn-primary w-full text-base">+ New shopping list</button>
+    <div className="px-5 space-y-5">
+      <button onClick={addList} className="btn-primary w-full">+ New shopping list</button>
 
       {lists.length === 0 && (
-        <div className="card text-center text-rose-400">
-          <p className="text-4xl mb-2">🛍️</p>
-          <p className="text-sm">No lists yet. Start with your next baking day!</p>
+        <div className="card text-center py-10">
+          <p className="font-display italic text-2xl text-muted mb-1">Nothing on the counter yet.</p>
+          <p className="text-sm text-subtle">Start a list for your next baking day.</p>
         </div>
       )}
 
       <div className="space-y-3">
-        {lists.map((l) => (
-          <button key={l.id} onClick={() => setOpenListId(l.id)} className="card w-full text-left active:scale-[0.99] transition">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-display text-lg text-rose-700">{l.name}</h3>
-                <p className="text-xs text-rose-400 mt-1">
-                  {l.cakes.length} cake{l.cakes.length !== 1 ? "s" : ""} • {l.cakes.reduce((s, c) => s + c.ingredients.length, 0)} ingredients
-                </p>
+        {lists.map((l, idx) => {
+          const ingCount = l.cakes.reduce((s, c) => s + c.ingredients.length, 0);
+          return (
+            <button key={l.id} onClick={() => setOpenListId(l.id)} className={`card w-full text-left active:scale-[0.99] transition rise rise-${Math.min(idx+1,3)}`}>
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-subtle">{new Date(l.createdAt).toLocaleDateString(undefined, { weekday: "long" })}</p>
+                  <h3 className="font-display text-[22px] text-ink truncate mt-0.5">{l.name}</h3>
+                  <p className="text-xs text-muted mt-1">
+                    {l.cakes.length} cake{l.cakes.length !== 1 ? "s" : ""} · {ingCount} ingredient{ingCount !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                <span className="font-display text-3xl text-subtle">→</span>
               </div>
-              <span className="chip">{new Date(l.createdAt).toLocaleDateString()}</span>
-            </div>
-          </button>
-        ))}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -146,12 +150,12 @@ function ListDetail({
     <div className="px-5 space-y-4">
       <div className="flex items-center justify-between">
         <button onClick={onBack} className="btn-ghost text-sm">← Back</button>
-        <button onClick={onDelete} className="text-xs text-rose-400">Delete list</button>
+        <button onClick={onDelete} className="text-xs text-muted">Delete list</button>
       </div>
 
       <div className="card">
         <input
-          className="input font-display text-xl text-rose-700"
+          className="input font-display text-xl text-ink"
           value={list.name}
           onChange={(e) => onChange({ ...list, name: e.target.value })}
         />
@@ -174,32 +178,36 @@ function ListDetail({
       </div>
 
       {list.cakes.length > 0 && (
-        <div className="card space-y-3">
-          <button onClick={() => setShowTotals(!showTotals)} className="w-full flex justify-between items-center">
-            <span className="font-display text-lg text-rose-700">✨ Total shopping list</span>
+        <div className="card space-y-3 relative overflow-hidden">
+          <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-accent/10 blur-2xl pointer-events-none" />
+          <button onClick={() => setShowTotals(!showTotals)} className="w-full flex justify-between items-baseline relative">
+            <div className="text-left">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-subtle">Buy list</p>
+              <span className="font-display text-2xl text-ink">Total shopping</span>
+            </div>
             <span className="chip">{totals.length} items</span>
           </button>
           {showTotals && (
-            <ul className="space-y-2 text-sm text-rose-900">
+            <ul className="space-y-2 text-sm text-ink">
               {totals.map((t, i) => (
-                <li key={i} className="border-b border-rose-50 pb-2">
+                <li key={i} className="border-b border-line pb-2">
                   <div className="flex justify-between">
                     <span>{t.name}</span>
                     <span className="font-semibold">{t.qty} {t.unit}</span>
                   </div>
                   {t.pack && (
-                    <div className="flex justify-end text-xs text-rose-500 mt-0.5">
+                    <div className="flex justify-end text-xs text-muted mt-0.5">
                       → buy <span className="font-bold mx-1">{t.pack.count} {t.pack.label}</span>
-                      <span className="text-rose-300">({t.pack.packSize} {t.pack.packUnit} each)</span>
+                      <span className="text-subtle">({t.pack.packSize} {t.pack.packUnit} each)</span>
                     </div>
                   )}
                   {t.unitMismatch && (
-                    <div className="text-[11px] text-red-500 text-right mt-0.5">
+                    <div className="text-[11px] text-warn text-right mt-0.5">
                       ⚠ Pack saved in <b>{t.unitMismatch.packUnit}</b> but ingredient is in <b>{t.unitMismatch.ingredientUnit}</b> — re-open 📦 and match units
                     </div>
                   )}
                   {!t.pack && !t.unitMismatch && (
-                    <div className="text-xs text-rose-300 text-right mt-0.5">📦 tap ingredient to set pack size</div>
+                    <div className="text-xs text-subtle text-right mt-0.5">📦 tap ingredient to set pack size</div>
                   )}
                 </li>
               ))}
@@ -253,15 +261,15 @@ function CakeCard({
 
   return (
     <div className="card space-y-3">
-      <div className="flex items-center gap-2">
-        <span className="text-xl">🎂</span>
-        <input
-          className="input flex-1 font-semibold text-rose-700"
-          value={cake.name}
-          onChange={(e) => onChange({ name: e.target.value })}
-        />
-        <button onClick={onDelete} className="text-rose-300 text-sm px-2">✕</button>
+      <div className="flex items-center gap-2 -mb-1">
+        <p className="text-[10px] uppercase tracking-[0.2em] text-subtle flex-1">Cake</p>
+        <button onClick={onDelete} className="text-subtle text-base px-1 leading-none">×</button>
       </div>
+      <input
+        className="input font-display text-xl text-ink"
+        value={cake.name}
+        onChange={(e) => onChange({ name: e.target.value })}
+      />
 
       <ul className="space-y-2">
         {cake.ingredients.map((i) => {
@@ -282,10 +290,10 @@ function CakeCard({
                 </select>
                 <button
                   onClick={() => setPackEditFor(packEditFor === i.id ? null : i.id)}
-                  className={`shrink-0 px-2 text-lg ${product ? "text-rose-500" : "text-rose-200"}`}
+                  className={`shrink-0 px-2 text-lg ${product ? "text-muted" : "text-subtle"}`}
                   title={product ? `${product.packSize} ${product.packUnit} per ${product.packLabelSingular}` : "Set pack size"}
                 >📦</button>
-                <button onClick={() => remove(i.id)} className="shrink-0 text-rose-300 px-1">✕</button>
+                <button onClick={() => remove(i.id)} className="shrink-0 text-subtle px-1">✕</button>
               </div>
               {packEditFor === i.id && (
                 <PackEditor
@@ -298,14 +306,14 @@ function CakeCard({
                 />
               )}
               {product && packEditFor !== i.id && (
-                <p className="text-[11px] text-rose-400 pl-1">📦 {product.packSize} {product.packUnit} per {product.packLabelSingular}</p>
+                <p className="text-[11px] text-muted pl-1">📦 {product.packSize} {product.packUnit} per {product.packLabelSingular}</p>
               )}
             </li>
           );
         })}
       </ul>
 
-      <div className="pt-2 border-t border-rose-50 space-y-2">
+      <div className="pt-2 border-t border-line space-y-2">
         <input className="input" placeholder="Ingredient (e.g. Milk)" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
         <div className="flex gap-2 items-center">
           <input

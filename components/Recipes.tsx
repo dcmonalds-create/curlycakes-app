@@ -100,7 +100,7 @@ export function Recipes() {
             key={c}
             onClick={() => setFilter(c)}
             className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition ${
-              filter === c ? "bg-rose-500 text-white" : "bg-white text-rose-500 border border-rose-100"
+              filter === c ? "bg-accent text-bg" : "bg-surface text-muted border border-line"
             }`}
           >
             {c}
@@ -109,23 +109,24 @@ export function Recipes() {
       </div>
 
       {visible.length === 0 && (
-        <div className="card text-center text-rose-400">
-          <p className="text-4xl mb-2">📒</p>
-          <p className="text-sm">No recipes here yet.</p>
+        <div className="card text-center py-10">
+          <p className="font-display italic text-2xl text-muted mb-1">Your notebook is empty.</p>
+          <p className="text-sm text-subtle">Add the first recipe.</p>
         </div>
       )}
 
       <div className="space-y-3">
-        {visible.map((r) => (
-          <button key={r.id} onClick={() => setOpenId(r.id)} className="card w-full text-left active:scale-[0.99] transition">
-            <div className="flex justify-between items-start">
+        {visible.map((r, idx) => (
+          <button key={r.id} onClick={() => setOpenId(r.id)} className={`card w-full text-left active:scale-[0.99] transition rise rise-${Math.min(idx+1,3)}`}>
+            <div className="flex justify-between items-start gap-3">
               <div className="min-w-0">
-                <h3 className="font-display text-lg text-rose-700 truncate">{r.title}</h3>
-                <p className="text-xs text-rose-400 mt-1">
-                  {(r.ingredients?.length ?? 0)} ingredients · 1 portion
+                <p className="text-[10px] uppercase tracking-[0.2em] text-subtle">{r.category}</p>
+                <h3 className="font-display text-[22px] text-ink truncate mt-0.5">{r.title}</h3>
+                <p className="text-xs text-muted mt-1">
+                  {(r.ingredients?.length ?? 0)} ingredient{(r.ingredients?.length ?? 0) !== 1 ? "s" : ""} · per portion
                 </p>
               </div>
-              <span className="chip ml-2 shrink-0">{r.category}</span>
+              <span className="font-display text-3xl text-subtle">→</span>
             </div>
           </button>
         ))}
@@ -188,12 +189,12 @@ function RecipeDetail({
     <div className="px-5 space-y-3">
       <div className="flex justify-between">
         <button onClick={onBack} className="btn-ghost text-sm">← Back</button>
-        <button onClick={onDelete} className="text-xs text-rose-400">Delete</button>
+        <button onClick={onDelete} className="text-xs text-muted">Delete</button>
       </div>
 
       <div className="card space-y-3">
         <input
-          className="input font-display text-xl text-rose-700"
+          className="input font-display text-xl text-ink"
           value={recipe.title}
           onChange={(e) => onChange({ ...recipe, title: e.target.value })}
         />
@@ -208,7 +209,7 @@ function RecipeDetail({
 
       <div className="card space-y-3">
         <div className="flex justify-between items-center">
-          <h3 className="font-display text-rose-700">🥣 Ingredients</h3>
+          <h3 className="font-display text-ink">🥣 Ingredients</h3>
           <span className="chip">for 1 portion</span>
         </div>
 
@@ -239,10 +240,10 @@ function RecipeDetail({
                   </select>
                   <button
                     onClick={() => setPackEditFor(packEditFor === i.id ? null : i.id)}
-                    className={`shrink-0 px-2 text-lg ${product ? "text-rose-500" : "text-rose-200"}`}
+                    className={`shrink-0 px-2 text-lg ${product ? "text-muted" : "text-subtle"}`}
                     title={product ? `${product.packSize} ${product.packUnit} per ${product.packLabelSingular}` : "Set pack size"}
                   >📦</button>
-                  <button onClick={() => removeIng(i.id)} className="shrink-0 text-rose-300 px-1">✕</button>
+                  <button onClick={() => removeIng(i.id)} className="shrink-0 text-subtle px-1">✕</button>
                 </div>
                 {packEditFor === i.id && (
                   <PackEditor
@@ -255,14 +256,14 @@ function RecipeDetail({
                   />
                 )}
                 {product && packEditFor !== i.id && (
-                  <p className="text-[11px] text-rose-400 pl-1">📦 {product.packSize} {product.packUnit} per {product.packLabelSingular}</p>
+                  <p className="text-[11px] text-muted pl-1">📦 {product.packSize} {product.packUnit} per {product.packLabelSingular}</p>
                 )}
               </li>
             );
           })}
         </ul>
 
-        <div className="pt-2 border-t border-rose-50 space-y-2">
+        <div className="pt-2 border-t border-line space-y-2">
           <input
             className="input"
             placeholder="Ingredient (e.g. Flour)"
@@ -291,7 +292,7 @@ function RecipeDetail({
       </div>
 
       <div className="card space-y-2">
-        <h3 className="font-display text-rose-700">📝 Method & notes</h3>
+        <h3 className="font-display text-ink">📝 Method & notes</h3>
         <textarea
           className="input min-h-[180px] leading-relaxed"
           placeholder="Mixing instructions, baking temp, decoration ideas…"
@@ -319,7 +320,7 @@ function RecipeDetail({
         />
       )}
 
-      <p className="text-[11px] text-rose-300 text-right">Last edited {new Date(recipe.updatedAt).toLocaleString()}</p>
+      <p className="text-[11px] text-subtle text-right">Last edited {new Date(recipe.updatedAt).toLocaleString()}</p>
     </div>
   );
 }
@@ -340,11 +341,11 @@ function AddToListPanel({
   const [newListName, setNewListName] = useState<string>("");
 
   return (
-    <div className="card space-y-3 border-2 border-rose-200">
-      <h3 className="font-display text-rose-700">Add "{recipeTitle}" to a list</h3>
+    <div className="card space-y-3 border-2 border-line">
+      <h3 className="font-display text-ink">Add "{recipeTitle}" to a list</h3>
 
       <div>
-        <label className="text-xs text-rose-500 font-semibold">Portions</label>
+        <label className="text-xs text-muted font-semibold">Portions</label>
         <div className="flex gap-2 items-center mt-1">
           <button
             onClick={() => setPortions(Math.max(1, portions - 1))}
@@ -363,13 +364,13 @@ function AddToListPanel({
             className="btn-ghost !px-4 !py-2 text-lg"
           >+</button>
         </div>
-        <p className="text-[11px] text-rose-400 mt-1">
+        <p className="text-[11px] text-muted mt-1">
           All ingredients will be multiplied × {portions}
         </p>
       </div>
 
       <div>
-        <label className="text-xs text-rose-500 font-semibold">Add to list</label>
+        <label className="text-xs text-muted font-semibold">Add to list</label>
         <select
           className="input mt-1"
           value={target}
