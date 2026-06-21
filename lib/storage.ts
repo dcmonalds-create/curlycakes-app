@@ -72,17 +72,34 @@ async function cloudRead(key: string): Promise<string | null> {
   return keys.map((k) => values[k] ?? "").join("");
 }
 
+const CLOUD_TIMEOUT_MS = 5000;
+
+function withTimeout<T>(p: Promise<T>, label: string): Promise<T> {
+  return new Promise<T>((res, rej) => {
+    const t = setTimeout(() => rej(new Error(`Telegram CloudStorage timed out: ${label}`)), CLOUD_TIMEOUT_MS);
+    p.then((v) => { clearTimeout(t); res(v); }, (e) => { clearTimeout(t); rej(e); });
+  });
+}
+
 function setItemP(cs: CloudStorage, k: string, v: string) {
-  return new Promise<void>((res, rej) => cs.setItem(k, v, (e) => (e ? rej(e) : res())));
+  return withTimeout(new Promise<void>((res, rej) => {
+    try { cs.setItem(k, v, (e) => (e ? rej(e) : res())); } catch (err) { rej(err as Error); }
+  }), `setItem ${k}`);
 }
 function getItemP(cs: CloudStorage, k: string) {
-  return new Promise<string>((res, rej) => cs.getItem(k, (e, v) => (e ? rej(e) : res(v))));
+  return withTimeout(new Promise<string>((res, rej) => {
+    try { cs.getItem(k, (e, v) => (e ? rej(e) : res(v))); } catch (err) { rej(err as Error); }
+  }), `getItem ${k}`);
 }
 function getItemsP(cs: CloudStorage, keys: string[]) {
-  return new Promise<Record<string, string>>((res, rej) => cs.getItems(keys, (e, v) => (e ? rej(e) : res(v))));
+  return withTimeout(new Promise<Record<string, string>>((res, rej) => {
+    try { cs.getItems(keys, (e, v) => (e ? rej(e) : res(v))); } catch (err) { rej(err as Error); }
+  }), `getItems[${keys.length}]`);
 }
 function removeItemP(cs: CloudStorage, k: string) {
-  return new Promise<void>((res, rej) => cs.removeItem(k, (e) => (e ? rej(e) : res())));
+  return withTimeout(new Promise<void>((res, rej) => {
+    try { cs.removeItem(k, (e) => (e ? rej(e) : res())); } catch (err) { rej(err as Error); }
+  }), `removeItem ${k}`);
 }
 
 // ---- Hybrid sync hook -------------------------------------------------------
@@ -97,8 +114,15 @@ export type SyncStatus = "idle" | "loading" | "saving" | "synced" | "offline" | 
 type Listener = (s: SyncStatus) => void;
 const listeners = new Set<Listener>();
 let globalStatus: SyncStatus = "idle";
-function setGlobal(s: SyncStatus) {
+let lastError: string | null = null;
+
+function setGlobal(s: SyncStatus, err?: unknown) {
   globalStatus = s;
+  if (err) {
+    lastError = err instanceof Error ? err.message : String(err);
+  } else if (s === "synced") {
+    lastError = null;
+  }
   listeners.forEach((l) => l(s));
 }
 export function useSyncStatus() {
@@ -109,6 +133,47 @@ export function useSyncStatus() {
     return () => { listeners.delete(setS); };
   }, []);
   return s;
+}
+
+export interface SyncDiagnostics {
+  status: SyncStatus;
+  lastError: string | null;
+  hasTelegram: boolean;
+  hasCloudStorage: boolean;
+  cloudStorageReady: boolean;
+  version: string | null;
+  platform: string | null;
+  hasInitData: boolean;
+  initDataLen: number;
+  userId: number | null;
+  cloudKeysCount: number | null;
+}
+
+export async function getSyncDiagnostics(): Promise<SyncDiagnostics> {
+  const wa: any = typeof window !== "undefined" ? (window as any).Telegram?.WebApp : null;
+  const cs = cloudStorage();
+  let cloudKeysCount: number | null = null;
+  if (cs) {
+    try {
+      const keys = await withTimeout(new Promise<string[]>((res, rej) => {
+        try { cs.getKeys((e, k) => (e ? rej(e) : res(k))); } catch (err) { rej(err as Error); }
+      }), "getKeys");
+      cloudKeysCount = keys.length;
+    } catch {}
+  }
+  return {
+    status: globalStatus,
+    lastError,
+    hasTelegram: !!wa,
+    hasCloudStorage: !!wa?.CloudStorage,
+    cloudStorageReady: !!cs,
+    version: wa?.version ?? null,
+    platform: wa?.platform ?? null,
+    hasInitData: !!wa?.initData,
+    initDataLen: wa?.initData?.length ?? 0,
+    userId: wa?.initDataUnsafe?.user?.id ?? null,
+    cloudKeysCount,
+  };
 }
 
 export function useLocalState<T>(key: string, initial: T) {
@@ -150,7 +215,7 @@ export function useLocalState<T>(key: string, initial: T) {
           }
           setStatus("synced"); setGlobal("synced");
         } catch (e) {
-          setStatus("offline"); setGlobal("offline");
+          setStatus("offline"); setGlobal("offline", e);
         }
       }
 
@@ -174,8 +239,8 @@ export function useLocalState<T>(key: string, initial: T) {
       try {
         await cloudWrite(key, serialized);
         setStatus("synced"); setGlobal("synced");
-      } catch {
-        setStatus("error"); setGlobal("error");
+      } catch (e) {
+        setStatus("error"); setGlobal("error", e);
       }
     }, 400);
   }, [key, value, hydrated]);
