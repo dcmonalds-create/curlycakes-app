@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { UNITS, type Unit, type Product } from "@/lib/types";
 import { normalizeName } from "@/lib/aggregate";
+import { parseQty } from "@/lib/qty";
 
 const PRESETS: { singular: string; plural: string; icon: string }[] = [
   { singular: "bottle", plural: "bottles", icon: "🍶" },
@@ -61,7 +62,7 @@ export function PackEditor({
   }
 
   function save() {
-    const n = Number(size);
+    const n = parseQty(size);
     const s = singular.trim();
     if (!n || n <= 0 || !s) return;
     const pl = plural.trim() || s;
@@ -83,8 +84,10 @@ export function PackEditor({
         <input
           className="input w-20 text-right"
           placeholder="Size"
-          type="number"
+          type="text"
           inputMode="decimal"
+          autoComplete="off"
+          pattern="[0-9.,]*"
           value={size}
           onChange={(e) => setSize(e.target.value)}
         />

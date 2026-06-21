@@ -4,6 +4,8 @@ import { useLocalState, uid } from "@/lib/storage";
 import { UNITS, type Recipe, type Ingredient, type Unit, type ShoppingList, type Product } from "@/lib/types";
 import { normalizeName } from "@/lib/aggregate";
 import { PackEditor } from "@/components/PackEditor";
+import { QtyInput } from "@/components/QtyInput";
+import { parseQty } from "@/lib/qty";
 
 const DEFAULT_CATEGORIES = ["Sponge", "Cream", "Frosting", "Decoration", "Dough", "Other"];
 
@@ -171,7 +173,7 @@ function RecipeDetail({
 
   function addIngredient() {
     const name = draft.name.trim();
-    const qty = Number(draft.qty);
+    const qty = parseQty(draft.qty);
     if (!name || !qty || qty <= 0) return;
     setIngredients([...ingredients, { id: uid(), name, qty, unit: draft.unit }]);
     setDraft({ name: "", qty: "", unit: draft.unit });
@@ -224,12 +226,10 @@ function RecipeDetail({
                   onChange={(e) => updateIng(i.id, { name: e.target.value })}
                 />
                 <div className="flex gap-2 items-center">
-                  <input
+                  <QtyInput
                     className="input flex-1 text-right"
-                    type="number"
-                    inputMode="decimal"
-                    value={i.qty === 0 ? "" : i.qty}
-                    onChange={(e) => updateIng(i.id, { qty: e.target.value === "" ? 0 : Number(e.target.value) })}
+                    value={i.qty}
+                    onChange={(n) => updateIng(i.id, { qty: n })}
                   />
                   <select
                     className="input flex-1"
@@ -274,8 +274,10 @@ function RecipeDetail({
             <input
               className="input flex-1 text-right"
               placeholder="Qty per portion"
-              type="number"
+              type="text"
               inputMode="decimal"
+              autoComplete="off"
+              pattern="[0-9.,]*"
               value={draft.qty}
               onChange={(e) => setDraft({ ...draft, qty: e.target.value })}
             />

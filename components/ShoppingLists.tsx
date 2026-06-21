@@ -5,6 +5,8 @@ import { UNITS, type ShoppingList, type Unit, type Ingredient, type Product } fr
 import { aggregate, buildShoppingMessage, normalizeName } from "@/lib/aggregate";
 import { shareViaTelegram, copyText } from "@/lib/telegram";
 import { PackEditor } from "@/components/PackEditor";
+import { QtyInput } from "@/components/QtyInput";
+import { parseQty } from "@/lib/qty";
 
 export function ShoppingLists() {
   const [lists, setLists] = useLocalState<ShoppingList[]>("cc:lists", []);
@@ -243,7 +245,7 @@ function CakeCard({
 
   function add() {
     const name = draft.name.trim();
-    const qty = Number(draft.qty);
+    const qty = parseQty(draft.qty);
     if (!name || !qty || qty <= 0) return;
     onChange({ ingredients: [...cake.ingredients, { id: uid(), name, qty, unit: draft.unit }] });
     setDraft({ name: "", qty: "", unit: draft.unit });
@@ -278,12 +280,10 @@ function CakeCard({
             <li key={i.id} className="space-y-1">
               <input className="input" value={i.name} onChange={(e) => update(i.id, { name: e.target.value })} />
               <div className="flex gap-2 items-center">
-                <input
+                <QtyInput
                   className="input flex-1 text-right"
-                  type="number"
-                  inputMode="decimal"
-                  value={i.qty === 0 ? "" : i.qty}
-                  onChange={(e) => update(i.id, { qty: e.target.value === "" ? 0 : Number(e.target.value) })}
+                  value={i.qty}
+                  onChange={(n) => update(i.id, { qty: n })}
                 />
                 <select className="input flex-1" value={i.unit} onChange={(e) => update(i.id, { unit: e.target.value as Unit })}>
                   {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
@@ -319,8 +319,10 @@ function CakeCard({
           <input
             className="input flex-1 text-right"
             placeholder="Qty"
-            type="number"
+            type="text"
             inputMode="decimal"
+            autoComplete="off"
+            pattern="[0-9.,]*"
             value={draft.qty}
             onChange={(e) => setDraft({ ...draft, qty: e.target.value })}
           />
