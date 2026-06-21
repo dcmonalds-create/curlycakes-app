@@ -36,5 +36,6 @@ export interface Recipe {
   title: string;
   category: string;
   body: string;
+  ingredients?: Ingredient[]; // quantities for 1 portion
   updatedAt: number;
 }
