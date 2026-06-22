@@ -24,6 +24,12 @@ export interface ShoppingList {
   checked?: string[];
 }
 
+export interface CakeSize {
+  id: string;
+  people: number;     // up to this many people
+  diameter: number;   // cm
+}
+
 export interface Product {
   name: string;          // lowercased key, e.g. "milk"
   displayName: string;   // "Milk"

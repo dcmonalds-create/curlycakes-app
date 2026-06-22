@@ -1,10 +1,11 @@
 "use client";
-export type TabKey = "lists" | "recipes";
+export type TabKey = "lists" | "recipes" | "sizes";
 
 export function Tabs({ tab, onChange }: { tab: TabKey; onChange: (t: TabKey) => void }) {
   const items: { k: TabKey; label: string }[] = [
     { k: "lists",   label: "Shopping" },
     { k: "recipes", label: "Recipes" },
+    { k: "sizes",   label: "Sizes" },
   ];
   return (
     <nav className="fixed left-1/2 -translate-x-1/2 bottom-3 z-30 safe-bottom">
@@ -15,7 +16,7 @@ export function Tabs({ tab, onChange }: { tab: TabKey; onChange: (t: TabKey) => 
             <button
               key={i.k}
               onClick={() => onChange(i.k)}
-              className={`relative px-5 py-2 rounded-full text-[13px] font-semibold tracking-wide uppercase transition
+              className={`relative px-4 py-2 rounded-full text-[12px] font-semibold tracking-wide uppercase transition
                 ${active ? "text-bg bg-ink" : "text-muted hover:text-ink"}`}
             >
               {i.label}
