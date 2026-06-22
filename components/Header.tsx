@@ -14,7 +14,7 @@ const LABEL: Record<string, { text: string; dot: string }> = {
 
 export function Header({ title, subtitle }: { title: string; subtitle?: string }) {
   const status = useSyncStatus();
-  const { theme, pref, cyclePref } = useTheme();
+  const { theme, toggle } = useTheme();
   const [diag, setDiag] = useState<SyncDiagnostics | null>(null);
   const [openDiag, setOpenDiag] = useState(false);
   const label = LABEL[status];
@@ -31,7 +31,9 @@ export function Header({ title, subtitle }: { title: string; subtitle?: string }
     alert("Diagnostics copied.");
   }
 
-  const themeIcon = pref === "auto" ? "◐" : pref === "light" ? "☀" : "☾";
+  // Show the icon of the theme you'd switch to (universal toggle pattern).
+  const themeIcon = theme === "dark" ? "☀" : "☾";
+  const themeLabel = theme === "dark" ? "Switch to light" : "Switch to dark";
 
   return (
     <header className="px-5 pt-7 pb-2">
@@ -46,10 +48,10 @@ export function Header({ title, subtitle }: { title: string; subtitle?: string }
         </div>
         <div className="flex items-center gap-1.5 shrink-0 rise rise-2">
           <button
-            onClick={cyclePref}
+            onClick={toggle}
             className="h-9 w-9 rounded-full border border-line bg-surface text-ink/80 text-base active:scale-95 transition"
-            title={`Theme: ${pref}`}
-            aria-label="Toggle theme"
+            title={themeLabel}
+            aria-label={themeLabel}
           >
             {themeIcon}
           </button>

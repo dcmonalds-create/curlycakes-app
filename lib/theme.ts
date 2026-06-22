@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 
 export type Theme = "light" | "dark";
-type ThemePref = Theme | "auto";
 
 const KEY = "cc:theme";
 
@@ -20,7 +19,6 @@ function apply(theme: Theme) {
   root.classList.remove("theme-light", "theme-dark");
   root.classList.add(theme === "dark" ? "theme-dark" : "theme-light");
   root.style.colorScheme = theme;
-  // Update Telegram header colors so the chrome blends in.
   // @ts-ignore
   const tg = window.Telegram?.WebApp;
   if (tg?.setHeaderColor) {
@@ -32,44 +30,24 @@ function apply(theme: Theme) {
 }
 
 export function useTheme() {
-  const [pref, setPref] = useState<ThemePref>("auto");
   const [theme, setTheme] = useState<Theme>("light");
 
   useEffect(() => {
-    const stored = (localStorage.getItem(KEY) as ThemePref) || "auto";
-    setPref(stored);
-    const initial: Theme = stored === "auto" ? detectSystem() : stored;
+    // Load saved preference, or fall back to the system / Telegram theme on first run.
+    const stored = localStorage.getItem(KEY);
+    const initial: Theme = stored === "light" || stored === "dark" ? stored : detectSystem();
     setTheme(initial);
     apply(initial);
-
-    // Watch system / Telegram changes when in auto mode
-    const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
-    const onChange = () => {
-      if ((localStorage.getItem(KEY) as ThemePref || "auto") === "auto") {
-        const t = detectSystem();
-        setTheme(t); apply(t);
-      }
-    };
-    mq?.addEventListener?.("change", onChange);
-    // @ts-ignore
-    const tg = window.Telegram?.WebApp;
-    tg?.onEvent?.("themeChanged", onChange);
-    return () => {
-      mq?.removeEventListener?.("change", onChange);
-      tg?.offEvent?.("themeChanged", onChange);
-    };
   }, []);
 
-  function cyclePref() {
-    const next: ThemePref = pref === "auto" ? "light" : pref === "light" ? "dark" : "auto";
+  function toggle() {
+    const next: Theme = theme === "dark" ? "light" : "dark";
     localStorage.setItem(KEY, next);
-    setPref(next);
-    const t: Theme = next === "auto" ? detectSystem() : next;
-    setTheme(t);
-    apply(t);
+    setTheme(next);
+    apply(next);
   }
 
-  return { theme, pref, cyclePref };
+  return { theme, toggle };
 }
 
 /* Keep the focused input visible above the on-screen keyboard.
