@@ -32,6 +32,8 @@ export function Recipes() {
 
   const visible = filter === "All" ? recipes : recipes.filter((r) => r.category === filter);
   const open = recipes.find((r) => r.id === openId) || null;
+  const [quickAddId, setQuickAddId] = useState<string | null>(null);
+  const quickAddRecipe = recipes.find((r) => r.id === quickAddId) || null;
 
   function addRecipe() {
     const title = prompt("Recipe title")?.trim();
@@ -131,21 +133,61 @@ export function Recipes() {
       )}
 
       <div className="space-y-3">
-        {visible.map((r, idx) => (
-          <button key={r.id} onClick={() => setOpenId(r.id)} className={`card w-full text-left active:scale-[0.99] transition rise rise-${Math.min(idx+1,3)}`}>
-            <div className="flex justify-between items-start gap-3">
-              <div className="min-w-0">
+        {visible.map((r, idx) => {
+          const hasIngredients = (r.ingredients?.length ?? 0) > 0;
+          return (
+            <div key={r.id} className={`card flex items-stretch p-0 overflow-hidden rise rise-${Math.min(idx+1,3)}`}>
+              <button
+                onClick={() => setOpenId(r.id)}
+                className="flex-1 text-left active:scale-[0.99] transition p-4 min-w-0"
+              >
                 <p className="text-[10px] uppercase tracking-[0.2em] text-subtle">{r.category}</p>
                 <h3 className="font-display text-[22px] text-ink truncate mt-0.5">{r.title}</h3>
                 <p className="text-xs text-muted mt-1">
                   {(r.ingredients?.length ?? 0)} ingredient{(r.ingredients?.length ?? 0) !== 1 ? "s" : ""} · for {r.baseDiameter ?? BASE_DIAMETER} cm
                 </p>
-              </div>
-              <span className="font-display text-3xl text-subtle">→</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (!hasIngredients) { alert("Add ingredients to this recipe first."); return; }
+                  setQuickAddId(r.id);
+                }}
+                className="shrink-0 grid place-items-center w-14 border-l border-line text-muted hover:text-ink active:bg-surface-2 transition"
+                title="Quick add to shopping list"
+                aria-label="Quick add to shopping list"
+              >
+                <span className="text-lg leading-none">🛒</span>
+                <span className="text-[10px] -mt-0.5">+</span>
+              </button>
             </div>
-          </button>
-        ))}
+          );
+        })}
       </div>
+
+      {quickAddRecipe && (
+        <div
+          className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-sm p-3 flex items-end sm:items-center justify-center"
+          onClick={() => setQuickAddId(null)}
+        >
+          <div className="max-w-md w-full mx-auto" onClick={(e) => e.stopPropagation()}>
+            <AddToListPanel
+              recipeTitle={quickAddRecipe.title}
+              recipeIngredients={quickAddRecipe.ingredients ?? []}
+              baseDiameter={quickAddRecipe.baseDiameter ?? BASE_DIAMETER}
+              sizes={sizes}
+              lists={lists}
+              onCancel={() => setQuickAddId(null)}
+              onConfirm={(d, m, lid, ln) => {
+                const ok = addToList(quickAddRecipe, d, m, lid, ln);
+                if (ok) {
+                  setQuickAddId(null);
+                  alert(`✨ Added "${quickAddRecipe.title}" (${d} cm${m > 1 ? ` ×${m}` : ""}).`);
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
