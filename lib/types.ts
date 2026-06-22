@@ -26,8 +26,9 @@ export interface ShoppingList {
 
 export interface CakeSize {
   id: string;
-  people: number;     // up to this many people
-  diameter: number;   // cm
+  diameter: number;     // cm — the tin diameter
+  people: number;       // max servings ("slices") for this size — used for the people-lookup
+  multiplier: number;   // scaling factor relative to the base 18cm (e.g. 22cm = 1.5)
 }
 
 export interface Product {
@@ -44,6 +45,7 @@ export interface Recipe {
   title: string;
   category: string;
   body: string;
-  ingredients?: Ingredient[]; // quantities for 1 portion
+  ingredients?: Ingredient[];     // quantities for the base cake diameter
+  baseDiameter?: number;          // cm — the diameter the ingredients are calibrated for (default 18)
   updatedAt: number;
 }
