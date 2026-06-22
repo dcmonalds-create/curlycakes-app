@@ -127,6 +127,21 @@ function ListDetail({
   }
 
   const totals = useMemo(() => aggregate(list.cakes, products), [list.cakes, products]);
+  const checkedSet = useMemo(() => new Set(list.checked ?? []), [list.checked]);
+  const totalKeys = useMemo(() => new Set(totals.map((t) => normalizeName(t.name))), [totals]);
+  const checkedCount = useMemo(
+    () => [...checkedSet].filter((k) => totalKeys.has(k)).length,
+    [checkedSet, totalKeys],
+  );
+
+  function toggleChecked(key: string) {
+    const next = new Set(list.checked ?? []);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    onChange({ ...list, checked: [...next] });
+  }
+  function clearChecked() {
+    onChange({ ...list, checked: [] });
+  }
 
   async function share() {
     const totals = aggregate(list.cakes, products);
@@ -187,35 +202,67 @@ function ListDetail({
               <p className="text-[10px] uppercase tracking-[0.2em] text-subtle">Buy list</p>
               <span className="font-display text-2xl text-ink">Total shopping</span>
             </div>
-            <span className="chip">{totals.length} items</span>
+            <span className="chip">
+              {checkedCount > 0 ? `${checkedCount}/${totals.length}` : `${totals.length} items`}
+            </span>
           </button>
           {showTotals && (
-            <ul className="space-y-2 text-sm text-ink">
-              {totals.map((t, i) => (
-                <li key={i} className="border-b border-line pb-2">
-                  <div className="flex justify-between">
-                    <span>{t.name}</span>
-                    <span className="font-semibold">{t.qty} {t.unit}</span>
-                  </div>
-                  {t.pack && (
-                    <div className="flex justify-end text-xs text-muted mt-0.5">
-                      → buy <span className="font-bold mx-1">{t.pack.count} {t.pack.label}</span>
-                      <span className="text-subtle">({t.pack.packSize} {t.pack.packUnit} each)</span>
-                    </div>
-                  )}
-                  {t.unitMismatch && (
-                    <div className="text-[11px] text-warn text-right mt-0.5">
-                      ⚠ Pack saved in <b>{t.unitMismatch.packUnit}</b> but ingredient is in <b>{t.unitMismatch.ingredientUnit}</b> — re-open 📦 and match units
-                    </div>
-                  )}
-                  {!t.pack && !t.unitMismatch && (
-                    <div className="text-xs text-subtle text-right mt-0.5">📦 tap ingredient to set pack size</div>
-                  )}
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="space-y-1.5 text-sm text-ink">
+                {totals.map((t) => {
+                  const key = normalizeName(t.name);
+                  const isChecked = checkedSet.has(key);
+                  return (
+                    <li key={key} className="border-b border-line pb-2 last:border-0">
+                      <button
+                        type="button"
+                        onClick={() => toggleChecked(key)}
+                        className="w-full flex items-start gap-3 py-1 text-left active:opacity-70 transition"
+                      >
+                        <span
+                          aria-hidden
+                          className={`mt-0.5 grid place-items-center shrink-0 w-5 h-5 rounded-full border-2 transition ${
+                            isChecked ? "bg-ink border-ink text-bg" : "border-line"
+                          }`}
+                        >
+                          {isChecked && <span className="text-[11px] leading-none">✓</span>}
+                        </span>
+                        <div className={`flex-1 min-w-0 transition ${isChecked ? "opacity-40 line-through decoration-1" : ""}`}>
+                          <div className="flex justify-between gap-2">
+                            <span className="truncate">{t.name}</span>
+                            <span className="font-semibold shrink-0">{t.qty} {t.unit}</span>
+                          </div>
+                          {t.pack && (
+                            <div className="flex justify-end text-xs text-muted mt-0.5">
+                              → buy <span className="font-bold mx-1">{t.pack.count} {t.pack.label}</span>
+                              <span className="text-subtle">({t.pack.packSize} {t.pack.packUnit} each)</span>
+                            </div>
+                          )}
+                          {t.unitMismatch && (
+                            <div className="text-[11px] text-warn text-right mt-0.5">
+                              ⚠ Pack saved in <b>{t.unitMismatch.packUnit}</b> but ingredient is in <b>{t.unitMismatch.ingredientUnit}</b>
+                            </div>
+                          )}
+                          {!t.pack && !t.unitMismatch && (
+                            <div className="text-[11px] text-subtle text-right mt-0.5">📦 tap ingredient to set pack size</div>
+                          )}
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              {checkedCount > 0 && (
+                <button
+                  onClick={clearChecked}
+                  className="text-[11px] text-muted underline w-full text-left"
+                >
+                  Clear {checkedCount} check{checkedCount !== 1 ? "s" : ""}
+                </button>
+              )}
+            </>
           )}
-          <div className="flex gap-2">
+          <div className="flex gap-2 pt-1">
             <button onClick={share} className="btn-primary flex-1">Send to Telegram</button>
             <button onClick={copy} className="btn-ghost">Copy</button>
           </div>

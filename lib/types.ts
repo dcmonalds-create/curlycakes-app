@@ -20,6 +20,8 @@ export interface ShoppingList {
   name: string;
   createdAt: number;
   cakes: Cake[];
+  /** Normalized ingredient names that have been checked off in the totals view. */
+  checked?: string[];
 }
 
 export interface Product {
