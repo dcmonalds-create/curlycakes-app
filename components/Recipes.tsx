@@ -191,19 +191,19 @@ export function Recipes() {
           onClick={() => setQuickAddId(null)}
         >
           <div className="max-w-md w-full mx-auto" onClick={(e) => e.stopPropagation()}>
-            <AddToListPanel
+            <QuickAddPanel
               recipe={quickAddRecipe}
-              sizes={sizes}
               lists={lists}
               onCancel={() => setQuickAddId(null)}
-              onConfirm={(opts, lid, ln) => {
+              onConfirm={(lid, ln) => {
+                const isCake = (quickAddRecipe.kind ?? "cake") === "cake";
+                const opts: { mode: "cake"; targetDiameter: number; multBy: number } | { mode: "other"; portions: number } = isCake
+                  ? { mode: "cake", targetDiameter: quickAddRecipe.baseDiameter ?? BASE_DIAMETER, multBy: 1 }
+                  : { mode: "other", portions: quickAddRecipe.basePortions ?? 1 };
                 const ok = addToList(quickAddRecipe, opts, lid, ln);
                 if (ok) {
                   setQuickAddId(null);
-                  const note = opts.mode === "cake"
-                    ? `${opts.targetDiameter} cm${opts.multBy > 1 ? ` ×${opts.multBy}` : ""}`
-                    : `×${opts.portions} portion${opts.portions > 1 ? "s" : ""}`;
-                  alert(`✨ Added "${quickAddRecipe.title}" (${note}).`);
+                  alert(`✨ Added "${quickAddRecipe.title}".`);
                 }
               }}
             />
@@ -457,6 +457,63 @@ function RecipeDetail({
       )}
 
       <p className="text-[11px] text-subtle text-right">Last edited {new Date(recipe.updatedAt).toLocaleString()}</p>
+    </div>
+  );
+}
+
+function QuickAddPanel({
+  recipe,
+  lists,
+  onCancel,
+  onConfirm,
+}: {
+  recipe: Recipe;
+  lists: ShoppingList[];
+  onCancel: () => void;
+  onConfirm: (listId: string | "__new__", newListName?: string) => void;
+}) {
+  const [target, setTarget] = useState<string>(lists[0]?.id ?? "__new__");
+  const [newListName, setNewListName] = useState<string>("");
+  const isCake = (recipe.kind ?? "cake") === "cake";
+  const baseHint = isCake
+    ? `at base ${recipe.baseDiameter ?? BASE_DIAMETER} cm`
+    : `at base ${recipe.basePortions ?? 1} portion${(recipe.basePortions ?? 1) !== 1 ? "s" : ""}`;
+
+  return (
+    <div className="card space-y-4 border-2 border-line">
+      <div>
+        <p className="text-[10px] uppercase tracking-[0.2em] text-subtle">Quick add</p>
+        <h3 className="font-display text-xl text-ink mt-0.5">{recipe.title}</h3>
+        <p className="text-[11px] text-muted mt-1">Will be added {baseHint}. Open the recipe to scale.</p>
+      </div>
+
+      <div>
+        <label className="text-[10px] uppercase tracking-[0.2em] text-subtle">Add to list</label>
+        <select className="input mt-2" value={target} onChange={(e) => setTarget(e.target.value)}>
+          {lists.map((l) => (
+            <option key={l.id} value={l.id}>{l.name} ({l.cakes.length})</option>
+          ))}
+          <option value="__new__">＋ New list…</option>
+        </select>
+        {target === "__new__" && (
+          <input
+            className="input mt-2"
+            placeholder={`List name (e.g. "${recipe.title} order")`}
+            value={newListName}
+            onChange={(e) => setNewListName(e.target.value)}
+          />
+        )}
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={() => onConfirm(target, target === "__new__" ? newListName : undefined)}
+          className="btn-primary flex-1"
+        >
+          Add to list
+        </button>
+        <button onClick={onCancel} className="btn-ghost">Cancel</button>
+      </div>
     </div>
   );
 }
