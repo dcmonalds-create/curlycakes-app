@@ -39,7 +39,11 @@ export function Recipes() {
     const title = prompt("Recipe title")?.trim();
     if (!title) return;
     const category = prompt(`Category? (e.g. ${DEFAULT_CATEGORIES.join(", ")})`)?.trim() || "Other";
-    const r: Recipe = { id: uid(), title, category, body: "", ingredients: [], baseDiameter: BASE_DIAMETER, updatedAt: Date.now() };
+    const r: Recipe = {
+      id: uid(), title, category, body: "", ingredients: [],
+      kind: "cake", baseDiameter: BASE_DIAMETER, basePortions: 1,
+      updatedAt: Date.now(),
+    };
     setRecipes([r, ...recipes]);
     setOpenId(r.id);
   }
@@ -54,10 +58,13 @@ export function Recipes() {
     if (openId === id) setOpenId(null);
   }
 
+  type AddOpts =
+    | { mode: "cake"; targetDiameter: number; multBy: number }
+    | { mode: "other"; portions: number };
+
   function addToList(
     recipe: Recipe,
-    targetDiameter: number,
-    multiplyBy: number,
+    opts: AddOpts,
     listId: string | "__new__",
     newListName?: string,
   ) {
@@ -66,19 +73,31 @@ export function Recipes() {
       alert("Add ingredients to this recipe first so the app can calculate quantities.");
       return false;
     }
-    const baseDiameter = recipe.baseDiameter ?? BASE_DIAMETER;
-    // First scale by diameter, then by integer count (e.g. two 22cm cakes).
-    const scaledByD = scaleByDiameter(ing, sizes, baseDiameter, targetDiameter);
-    const scaled: Ingredient[] = scaledByD.map((i) => ({
-      id: uid(),
-      name: i.name,
-      qty: Math.round(i.qty * multiplyBy * 100) / 100,
-      unit: i.unit,
-    }));
-    const cakeName =
-      `${recipe.title} (${targetDiameter} cm)${multiplyBy > 1 ? ` ×${multiplyBy}` : ""}`;
-    const cake = { id: uid(), name: cakeName, ingredients: scaled };
 
+    let scaled: Ingredient[];
+    let cakeName: string;
+
+    if (opts.mode === "cake") {
+      const baseDiameter = recipe.baseDiameter ?? BASE_DIAMETER;
+      const scaledByD = scaleByDiameter(ing, sizes, baseDiameter, opts.targetDiameter);
+      scaled = scaledByD.map((i) => ({
+        id: uid(), name: i.name,
+        qty: Math.round(i.qty * opts.multBy * 100) / 100,
+        unit: i.unit,
+      }));
+      cakeName = `${recipe.title} (${opts.targetDiameter} cm)${opts.multBy > 1 ? ` ×${opts.multBy}` : ""}`;
+    } else {
+      const basePortions = recipe.basePortions ?? 1;
+      const factor = opts.portions / basePortions;
+      scaled = ing.map((i) => ({
+        id: uid(), name: i.name,
+        qty: Math.round(i.qty * factor * 100) / 100,
+        unit: i.unit,
+      }));
+      cakeName = opts.portions > 1 ? `${recipe.title} ×${opts.portions}` : recipe.title;
+    }
+
+    const cake = { id: uid(), name: cakeName, ingredients: scaled };
     if (listId === "__new__") {
       const name = (newListName?.trim()) || `${recipe.title} list`;
       const newList: ShoppingList = { id: uid(), name, createdAt: Date.now(), cakes: [cake] };
@@ -99,7 +118,7 @@ export function Recipes() {
         onBack={() => setOpenId(null)}
         onChange={update}
         onDelete={() => remove(open.id)}
-        onAddToList={(diameter, multBy, lid, ln) => addToList(open, diameter, multBy, lid, ln)}
+        onAddToList={(opts, lid, ln) => addToList(open, opts, lid, ln)}
         onUpsertProduct={upsertProduct}
         onRemoveProduct={removeProduct}
         categories={categories}
@@ -144,7 +163,9 @@ export function Recipes() {
                 <p className="text-[10px] uppercase tracking-[0.2em] text-subtle">{r.category}</p>
                 <h3 className="font-display text-[22px] text-ink truncate mt-0.5">{r.title}</h3>
                 <p className="text-xs text-muted mt-1">
-                  {(r.ingredients?.length ?? 0)} ingredient{(r.ingredients?.length ?? 0) !== 1 ? "s" : ""} · for {r.baseDiameter ?? BASE_DIAMETER} cm
+                  {(r.ingredients?.length ?? 0)} ingredient{(r.ingredients?.length ?? 0) !== 1 ? "s" : ""} · {(r.kind ?? "cake") === "cake"
+                    ? `for ${r.baseDiameter ?? BASE_DIAMETER} cm`
+                    : `for ${r.basePortions ?? 1} portion${(r.basePortions ?? 1) !== 1 ? "s" : ""}`}
                 </p>
               </button>
               <button
@@ -171,17 +192,18 @@ export function Recipes() {
         >
           <div className="max-w-md w-full mx-auto" onClick={(e) => e.stopPropagation()}>
             <AddToListPanel
-              recipeTitle={quickAddRecipe.title}
-              recipeIngredients={quickAddRecipe.ingredients ?? []}
-              baseDiameter={quickAddRecipe.baseDiameter ?? BASE_DIAMETER}
+              recipe={quickAddRecipe}
               sizes={sizes}
               lists={lists}
               onCancel={() => setQuickAddId(null)}
-              onConfirm={(d, m, lid, ln) => {
-                const ok = addToList(quickAddRecipe, d, m, lid, ln);
+              onConfirm={(opts, lid, ln) => {
+                const ok = addToList(quickAddRecipe, opts, lid, ln);
                 if (ok) {
                   setQuickAddId(null);
-                  alert(`✨ Added "${quickAddRecipe.title}" (${d} cm${m > 1 ? ` ×${m}` : ""}).`);
+                  const note = opts.mode === "cake"
+                    ? `${opts.targetDiameter} cm${opts.multBy > 1 ? ` ×${opts.multBy}` : ""}`
+                    : `×${opts.portions} portion${opts.portions > 1 ? "s" : ""}`;
+                  alert(`✨ Added "${quickAddRecipe.title}" (${note}).`);
                 }
               }}
             />
@@ -212,7 +234,11 @@ function RecipeDetail({
   onBack: () => void;
   onChange: (r: Recipe) => void;
   onDelete: () => void;
-  onAddToList: (targetDiameter: number, multiplyBy: number, listId: string | "__new__", newListName?: string) => boolean;
+  onAddToList: (
+    opts: { mode: "cake"; targetDiameter: number; multBy: number } | { mode: "other"; portions: number },
+    listId: string | "__new__",
+    newListName?: string,
+  ) => boolean;
   onUpsertProduct: (p: Product) => void;
   onRemoveProduct: (name: string) => void;
   categories: string[];
@@ -257,18 +283,35 @@ function RecipeDetail({
           value={recipe.title}
           onChange={(e) => onChange({ ...recipe, title: e.target.value })}
         />
-        <div className="flex gap-2">
-          <select
-            className="input flex-1"
-            value={recipe.category}
-            onChange={(e) => onChange({ ...recipe, category: e.target.value })}
-          >
-            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <label className="flex items-center gap-2 shrink-0">
-            <span className="text-[10px] uppercase tracking-wider text-muted">Base</span>
+        <select
+          className="input"
+          value={recipe.category}
+          onChange={(e) => onChange({ ...recipe, category: e.target.value })}
+        >
+          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+
+        <div className="flex gap-1 p-1 bg-surface-2 rounded-full">
+          {(["cake", "other"] as const).map((k) => {
+            const active = (recipe.kind ?? "cake") === k;
+            return (
+              <button
+                key={k}
+                onClick={() => onChange({ ...recipe, kind: k })}
+                className={`flex-1 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide transition
+                  ${active ? "bg-ink text-bg" : "text-muted"}`}
+              >
+                {k === "cake" ? "Cake (by diameter)" : "Other (by portions)"}
+              </button>
+            );
+          })}
+        </div>
+
+        {(recipe.kind ?? "cake") === "cake" ? (
+          <label className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-wider text-muted">Base diameter</span>
             <select
-              className="input w-24"
+              className="input flex-1"
               value={recipe.baseDiameter ?? BASE_DIAMETER}
               onChange={(e) => onChange({ ...recipe, baseDiameter: Number(e.target.value) })}
             >
@@ -277,13 +320,29 @@ function RecipeDetail({
               ))}
             </select>
           </label>
-        </div>
+        ) : (
+          <label className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-wider text-muted">Base portions</span>
+            <input
+              className="input flex-1 text-right"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={recipe.basePortions ?? 1}
+              onChange={(e) => onChange({ ...recipe, basePortions: Math.max(1, Number(e.target.value.replace(/[^0-9]/g, "")) || 1) })}
+            />
+          </label>
+        )}
       </div>
 
       <div className="card space-y-3">
         <div className="flex justify-between items-center">
           <h3 className="font-display text-ink">🥣 Ingredients</h3>
-          <span className="chip">for {recipe.baseDiameter ?? BASE_DIAMETER} cm</span>
+          <span className="chip">
+            {(recipe.kind ?? "cake") === "cake"
+              ? `for ${recipe.baseDiameter ?? BASE_DIAMETER} cm`
+              : `for ${recipe.basePortions ?? 1} portion${(recipe.basePortions ?? 1) !== 1 ? "s" : ""}`}
+          </span>
         </div>
 
         <ul className="space-y-2">
@@ -380,17 +439,18 @@ function RecipeDetail({
         </button>
       ) : (
         <AddToListPanel
-          recipeTitle={recipe.title}
-          recipeIngredients={ingredients}
-          baseDiameter={recipe.baseDiameter ?? BASE_DIAMETER}
+          recipe={recipe}
           sizes={sizes}
           lists={lists}
           onCancel={() => setShowAdder(false)}
-          onConfirm={(diameter, multBy, listId, newListName) => {
-            const ok = onAddToList(diameter, multBy, listId, newListName);
+          onConfirm={(opts, listId, newListName) => {
+            const ok = onAddToList(opts, listId, newListName);
             if (ok) {
               setShowAdder(false);
-              alert(`✨ Added (${diameter} cm${multBy > 1 ? ` ×${multBy}` : ""}).`);
+              const note = opts.mode === "cake"
+                ? `${opts.targetDiameter} cm${opts.multBy > 1 ? ` ×${opts.multBy}` : ""}`
+                : `×${opts.portions} portion${opts.portions > 1 ? "s" : ""}`;
+              alert(`✨ Added (${note}).`);
             }
           }}
         />
@@ -401,93 +461,100 @@ function RecipeDetail({
   );
 }
 
+type AddOpts =
+  | { mode: "cake"; targetDiameter: number; multBy: number }
+  | { mode: "other"; portions: number };
+
 function AddToListPanel({
-  recipeTitle,
-  recipeIngredients,
-  baseDiameter,
+  recipe,
   sizes,
   lists,
   onCancel,
   onConfirm,
 }: {
-  recipeTitle: string;
-  recipeIngredients: Ingredient[];
-  baseDiameter: number;
+  recipe: Recipe;
   sizes: CakeSize[];
   lists: ShoppingList[];
   onCancel: () => void;
-  onConfirm: (targetDiameter: number, multiplyBy: number, listId: string | "__new__", newListName?: string) => void;
+  onConfirm: (opts: AddOpts, listId: string | "__new__", newListName?: string) => void;
 }) {
+  const isCake = (recipe.kind ?? "cake") === "cake";
+  const baseDiameter = recipe.baseDiameter ?? BASE_DIAMETER;
+  const basePortions = recipe.basePortions ?? 1;
+  const recipeIngredients = recipe.ingredients ?? [];
+
   const sorted = useMemo(() => sortByDiameter(sizes), [sizes]);
   const [diameter, setDiameter] = useState<number>(baseDiameter);
   const [multBy, setMultBy] = useState<number>(1);
+  const [portions, setPortions] = useState<number>(basePortions);
   const [target, setTarget] = useState<string>(lists[0]?.id ?? "__new__");
   const [newListName, setNewListName] = useState<string>("");
 
   const baseMult = multiplierFor(sizes, baseDiameter);
   const targetMult = multiplierFor(sizes, diameter);
-  const factor = baseMult > 0 ? (targetMult / baseMult) * multBy : multBy;
+  const cakeFactor = baseMult > 0 ? (targetMult / baseMult) * multBy : multBy;
+  const otherFactor = basePortions > 0 ? portions / basePortions : portions;
 
-  const preview = useMemo(
-    () => scaleByDiameter(recipeIngredients, sizes, baseDiameter, diameter).map((i) => ({
-      ...i,
-      qty: Math.round(i.qty * multBy * 100) / 100,
-    })),
-    [recipeIngredients, sizes, baseDiameter, diameter, multBy],
-  );
+  const preview = useMemo(() => {
+    if (isCake) {
+      return scaleByDiameter(recipeIngredients, sizes, baseDiameter, diameter).map((i) => ({
+        ...i, qty: Math.round(i.qty * multBy * 100) / 100,
+      }));
+    }
+    return recipeIngredients.map((i) => ({
+      ...i, qty: Math.round(i.qty * otherFactor * 100) / 100,
+    }));
+  }, [isCake, recipeIngredients, sizes, baseDiameter, diameter, multBy, otherFactor]);
+
+  const confirm = () => {
+    const opts: AddOpts = isCake
+      ? { mode: "cake", targetDiameter: diameter, multBy }
+      : { mode: "other", portions };
+    onConfirm(opts, target, target === "__new__" ? newListName : undefined);
+  };
 
   return (
     <div className="card space-y-4 border-2 border-line">
       <div>
         <p className="text-[10px] uppercase tracking-[0.2em] text-subtle">Add to shopping list</p>
-        <h3 className="font-display text-xl text-ink mt-0.5">{recipeTitle}</h3>
-        <p className="text-[11px] text-muted mt-1">Recipe is calibrated for {baseDiameter} cm (×{baseMult}).</p>
-      </div>
-
-      <div>
-        <label className="text-[10px] uppercase tracking-[0.2em] text-subtle">Target diameter</label>
-        <div className="flex flex-wrap gap-1.5 mt-2">
-          {sorted.map((s) => {
-            const active = s.diameter === diameter;
-            return (
-              <button
-                key={s.id}
-                onClick={() => setDiameter(s.diameter)}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition border
-                  ${active ? "bg-ink text-bg border-ink" : "bg-surface text-ink border-line"}`}
-              >
-                {s.diameter}<span className={`ml-1 text-[10px] ${active ? "opacity-70" : "text-muted"}`}>cm · {s.people}p</span>
-              </button>
-            );
-          })}
-        </div>
-        <p className="text-[11px] text-muted mt-2">
-          Scaling × <span className="font-semibold text-ink">{Math.round(factor * 100) / 100}</span>
-          {" "}(base {baseMult} → target {targetMult}{multBy > 1 ? `, × ${multBy} cakes` : ""})
+        <h3 className="font-display text-xl text-ink mt-0.5">{recipe.title}</h3>
+        <p className="text-[11px] text-muted mt-1">
+          {isCake
+            ? `Calibrated for ${baseDiameter} cm (×${baseMult}).`
+            : `Calibrated for ${basePortions} portion${basePortions !== 1 ? "s" : ""}.`}
         </p>
       </div>
 
-      <div>
-        <label className="text-[10px] uppercase tracking-[0.2em] text-subtle">How many cakes?</label>
-        <div className="flex gap-2 items-center mt-2">
-          <button
-            onClick={() => setMultBy(Math.max(1, multBy - 1))}
-            className="btn-ghost !px-4 !py-2 text-lg"
-          >−</button>
-          <input
-            className="input flex-1 text-center text-lg font-bold"
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            value={multBy}
-            onChange={(e) => setMultBy(Math.max(1, Number(e.target.value.replace(/[^0-9]/g, "")) || 1))}
-          />
-          <button
-            onClick={() => setMultBy(multBy + 1)}
-            className="btn-ghost !px-4 !py-2 text-lg"
-          >+</button>
-        </div>
-      </div>
+      {isCake ? (
+        <>
+          <div>
+            <label className="text-[10px] uppercase tracking-[0.2em] text-subtle">Target diameter</label>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {sorted.map((s) => {
+                const active = s.diameter === diameter;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => setDiameter(s.diameter)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition border
+                      ${active ? "bg-ink text-bg border-ink" : "bg-surface text-ink border-line"}`}
+                  >
+                    {s.diameter}<span className={`ml-1 text-[10px] ${active ? "opacity-70" : "text-muted"}`}>cm · {s.people}p</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-muted mt-2">
+              Scaling × <span className="font-semibold text-ink">{Math.round(cakeFactor * 100) / 100}</span>
+              {" "}(base {baseMult} → target {targetMult}{multBy > 1 ? `, × ${multBy} cakes` : ""})
+            </p>
+          </div>
+
+          <Stepper label="How many cakes?" value={multBy} onChange={setMultBy} />
+        </>
+      ) : (
+        <Stepper label="Portions" value={portions} onChange={setPortions} />
+      )}
 
       {preview.length > 0 && (
         <details className="text-xs">
@@ -518,7 +585,7 @@ function AddToListPanel({
         {target === "__new__" && (
           <input
             className="input mt-2"
-            placeholder={`List name (e.g. "${recipeTitle} order")`}
+            placeholder={`List name (e.g. "${recipe.title} order")`}
             value={newListName}
             onChange={(e) => setNewListName(e.target.value)}
           />
@@ -526,13 +593,32 @@ function AddToListPanel({
       </div>
 
       <div className="flex gap-2">
-        <button
-          onClick={() => onConfirm(diameter, multBy, target, target === "__new__" ? newListName : undefined)}
-          className="btn-primary flex-1"
-        >
-          Add {diameter} cm{multBy > 1 ? ` ×${multBy}` : ""}
+        <button onClick={confirm} className="btn-primary flex-1">
+          {isCake
+            ? `Add ${diameter} cm${multBy > 1 ? ` ×${multBy}` : ""}`
+            : `Add ×${portions} portion${portions > 1 ? "s" : ""}`}
         </button>
         <button onClick={onCancel} className="btn-ghost">Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function Stepper({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) {
+  return (
+    <div>
+      <label className="text-[10px] uppercase tracking-[0.2em] text-subtle">{label}</label>
+      <div className="flex gap-2 items-center mt-2">
+        <button onClick={() => onChange(Math.max(1, value - 1))} className="btn-ghost !px-4 !py-2 text-lg">−</button>
+        <input
+          className="input flex-1 text-center text-lg font-bold"
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={value}
+          onChange={(e) => onChange(Math.max(1, Number(e.target.value.replace(/[^0-9]/g, "")) || 1))}
+        />
+        <button onClick={() => onChange(value + 1)} className="btn-ghost !px-4 !py-2 text-lg">+</button>
       </div>
     </div>
   );

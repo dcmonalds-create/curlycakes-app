@@ -40,12 +40,16 @@ export interface Product {
   packLabelPlural: string;   // "bottles"
 }
 
+export type RecipeKind = "cake" | "other";
+
 export interface Recipe {
   id: string;
   title: string;
   category: string;
   body: string;
-  ingredients?: Ingredient[];     // quantities for the base cake diameter
-  baseDiameter?: number;          // cm — the diameter the ingredients are calibrated for (default 18)
+  ingredients?: Ingredient[];     // quantities for the base portion / diameter
+  kind?: RecipeKind;              // "cake" → scales by diameter, "other" → scales by portions
+  baseDiameter?: number;          // cm — only meaningful when kind = "cake" (default 18)
+  basePortions?: number;          // only meaningful when kind = "other" (default 1)
   updatedAt: number;
 }

@@ -1,11 +1,14 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useLocalState, uid } from "@/lib/storage";
-import type { CakeSize } from "@/lib/types";
-import { DEFAULT_SIZE_TABLE, findSizeForPeople, sortByDiameter } from "@/lib/sizes";
+import type { CakeSize, Recipe, ShoppingList, Ingredient } from "@/lib/types";
+import { DEFAULT_SIZE_TABLE, findSizeForPeople, sortByDiameter, scaleByDiameter, BASE_DIAMETER } from "@/lib/sizes";
+import { QtyInput } from "@/components/QtyInput";
 
 export function Sizes() {
   const [table, setTable, hydrated] = useLocalState<CakeSize[]>("cc:sizes", DEFAULT_SIZE_TABLE);
+  const [recipes] = useLocalState<Recipe[]>("cc:recipes", []);
+  const [lists, setLists] = useLocalState<ShoppingList[]>("cc:lists", []);
   const [people, setPeople] = useState<string>("");
   const [editing, setEditing] = useState<boolean>(false);
 
@@ -51,9 +54,132 @@ export function Sizes() {
         )}
       </div>
 
+      {peopleNum > 0 && match && recipes.length > 0 && (
+        <BuildList
+          target={match}
+          recipes={recipes}
+          sizes={table}
+          lists={lists}
+          onSave={setLists}
+        />
+      )}
+
       <button onClick={() => setEditing(true)} className="btn-ghost w-full">
         Edit size table ({table.length} entries)
       </button>
+    </div>
+  );
+}
+
+function BuildList({
+  target,
+  recipes,
+  sizes,
+  lists,
+  onSave,
+}: {
+  target: CakeSize;
+  recipes: Recipe[];
+  sizes: CakeSize[];
+  lists: ShoppingList[];
+  onSave: (next: ShoppingList[]) => void;
+}) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [listId, setListId] = useState<string>(lists[0]?.id ?? "__new__");
+  const [newListName, setNewListName] = useState<string>("");
+
+  // Only cake-kind recipes can be scaled by diameter. "Other" recipes go in unchanged at base portions.
+  const cakeRecipes = useMemo(() => recipes.filter((r) => (r.kind ?? "cake") === "cake" && (r.ingredients?.length ?? 0) > 0), [recipes]);
+
+  function toggle(id: string) {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelected(next);
+  }
+
+  function addAll() {
+    const picked = recipes.filter((r) => selected.has(r.id));
+    if (picked.length === 0) return;
+    const cakes = picked.map((r) => {
+      const baseD = r.baseDiameter ?? BASE_DIAMETER;
+      const scaled: Ingredient[] = scaleByDiameter(r.ingredients ?? [], sizes, baseD, target.diameter).map((i) => ({
+        id: uid(), name: i.name, qty: i.qty, unit: i.unit,
+      }));
+      return { id: uid(), name: `${r.title} (${target.diameter} cm)`, ingredients: scaled };
+    });
+    if (listId === "__new__") {
+      const name = (newListName.trim()) || `${target.diameter} cm cake`;
+      const newList: ShoppingList = { id: uid(), name, createdAt: Date.now(), cakes };
+      onSave([newList, ...lists]);
+    } else {
+      onSave(lists.map((l) => (l.id === listId ? { ...l, cakes: [...l.cakes, ...cakes] } : l)));
+    }
+    setSelected(new Set());
+    alert(`✨ Added ${cakes.length} recipe${cakes.length !== 1 ? "s" : ""} scaled to ${target.diameter} cm.`);
+  }
+
+  return (
+    <div className="card space-y-3">
+      <div>
+        <p className="text-[10px] uppercase tracking-[0.2em] text-subtle">Build a list</p>
+        <h3 className="font-display text-xl text-ink mt-0.5">Recipes for this {target.diameter} cm cake</h3>
+        <p className="text-[11px] text-muted mt-1">
+          Each recipe will be auto-scaled from its base diameter to {target.diameter} cm (×{target.multiplier}).
+        </p>
+      </div>
+
+      {cakeRecipes.length === 0 ? (
+        <p className="text-sm text-muted text-center py-3">No "cake" recipes with ingredients yet.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {cakeRecipes.map((r) => {
+            const checked = selected.has(r.id);
+            return (
+              <li key={r.id}>
+                <button
+                  onClick={() => toggle(r.id)}
+                  className="w-full flex items-center gap-3 text-left p-2 -mx-2 rounded-lg active:bg-surface-2 transition"
+                >
+                  <span className={`grid place-items-center shrink-0 w-5 h-5 rounded-full border-2 transition
+                    ${checked ? "bg-ink border-ink text-bg" : "border-line"}`}>
+                    {checked && <span className="text-[11px] leading-none">✓</span>}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-ink truncate">{r.title}</p>
+                    <p className="text-[11px] text-muted">{r.category} · base {r.baseDiameter ?? BASE_DIAMETER} cm</p>
+                  </div>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {selected.size > 0 && (
+        <>
+          <div>
+            <label className="text-[10px] uppercase tracking-[0.2em] text-subtle">Add to list</label>
+            <select className="input mt-2" value={listId} onChange={(e) => setListId(e.target.value)}>
+              {lists.map((l) => (
+                <option key={l.id} value={l.id}>{l.name} ({l.cakes.length})</option>
+              ))}
+              <option value="__new__">＋ New list…</option>
+            </select>
+            {listId === "__new__" && (
+              <input
+                className="input mt-2"
+                placeholder={`List name (e.g. "Saturday order")`}
+                value={newListName}
+                onChange={(e) => setNewListName(e.target.value)}
+              />
+            )}
+          </div>
+
+          <button onClick={addAll} className="btn-primary w-full">
+            Add {selected.size} recipe{selected.size !== 1 ? "s" : ""} to list
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -148,16 +274,10 @@ function SizeTable({
                 value={r.people || ""}
                 onChange={(e) => update(r.id, { people: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })}
               />
-              <input
+              <QtyInput
                 className="input w-20 text-right"
-                type="text"
-                inputMode="decimal"
-                pattern="[0-9.,]*"
-                value={r.multiplier || ""}
-                onChange={(e) => {
-                  const cleaned = e.target.value.replace(",", ".").replace(/[^0-9.]/g, "");
-                  update(r.id, { multiplier: Number(cleaned) || 0 });
-                }}
+                value={r.multiplier}
+                onChange={(n) => update(r.id, { multiplier: n })}
               />
               <button onClick={() => remove(r.id)} className="w-6 text-subtle text-lg leading-none">×</button>
             </li>
