@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useLocalState, uid } from "@/lib/storage";
 import { UNITS, type ShoppingList, type Unit, type Ingredient, type Product, type InventoryItem } from "@/lib/types";
 import { aggregate, buildShoppingMessage, normalizeName } from "@/lib/aggregate";
-import { shareViaTelegram, copyText, tgConfirm } from "@/lib/telegram";
+import { shareViaTelegram, copyText, tgConfirm, tgAlert } from "@/lib/telegram";
 import { PackEditor } from "@/components/PackEditor";
 import { QtyInput } from "@/components/QtyInput";
 import { parseQty } from "@/lib/qty";
@@ -150,13 +150,13 @@ function ListDetail({
   async function share() {
     const totals = aggregate(list.cakes, products);
     if (totals.length === 0) {
-      alert("Add ingredients to your cakes first — the list is empty ✨");
+      tgAlert("Add ingredients to your cakes first — the list is empty ✨");
       return;
     }
     const msg = buildShoppingMessage(list.name, list.cakes, products);
     const result = await shareViaTelegram(msg);
     if (result === "browser-tab") {
-      alert("Copied to clipboard & opened Telegram share — pick a chat.");
+      tgAlert("Copied to clipboard & opened Telegram share — pick a chat.");
     } else if (result === "telegram-link") {
       // Telegram opened the share dialog natively; also copied as backup
     }
@@ -164,12 +164,12 @@ function ListDetail({
 
   async function copy() {
     const ok = await copyText(buildShoppingMessage(list.name, list.cakes, products));
-    alert(ok ? "Copied to clipboard ✨" : "Couldn't copy");
+    tgAlert(ok ? "Copied to clipboard ✨" : "Couldn't copy");
   }
 
   async function doneBaking() {
     if (totals.length === 0) {
-      alert("Nothing to deduct — your list is empty.");
+      tgAlert("Nothing to deduct — your list is empty.");
       return;
     }
     if (!await tgConfirm(`Mark "${list.name}" as baked? This will subtract ${totals.length} ingredient${totals.length !== 1 ? "s" : ""} from your pantry.`)) return;
@@ -179,10 +179,10 @@ function ListDetail({
     );
     setInventory(nextInv);
     if (shortages.length > 0) {
-      const list = shortages.map((s) => `  • ${s.name}: ${s.missing} ${s.unit} short`).join("\n");
-      alert(`Done ✓ — but you didn't have enough of:\n${list}`);
+      const shortageLines = shortages.map((s) => `  • ${s.name}: ${s.missing} ${s.unit} short`).join("\n");
+      tgAlert(`Done ✓ — but you didn't have enough of:\n${shortageLines}`);
     } else {
-      alert("Done ✓ — pantry updated.");
+      tgAlert("Done ✓ — pantry updated.");
     }
   }
 

@@ -6,7 +6,7 @@ interface TgWebApp {
   HapticFeedback?: { impactOccurred: (s: string) => void };
   switchInlineQuery?: (q: string, targets?: string[]) => void;
   openTelegramLink?: (url: string) => void;
-  showAlert?: (msg: string) => void;
+  showAlert?: (msg: string, callback?: () => void) => void;
   showPopup?: (params: { title?: string; message: string; buttons?: { id?: string; type?: string; text?: string }[] }, cb?: (id: string) => void) => void;
   themeParams?: Record<string, string>;
   initData?: string;
@@ -52,14 +52,15 @@ export async function shareViaTelegram(text: string): Promise<ShareResult> {
   return copied ? "browser-tab" : "browser-tab";
 }
 
-/** Confirmation dialog that works inside Telegram (uses showPopup) and in browser (falls back to window.confirm). */
+/** Confirmation dialog — uses Telegram's native showPopup inside Telegram, window.confirm in browser. */
 export function tgConfirm(message: string): Promise<boolean> {
   const t = tg();
   if (t?.showPopup) {
     return new Promise((resolve) => {
       try {
+        // Valid Telegram button types: "ok", "close", "destructive", "default"
         t.showPopup!(
-          { message, buttons: [{ id: "ok", type: "ok" }, { id: "cancel", type: "cancel" }] },
+          { message, buttons: [{ id: "ok", type: "ok" }, { id: "cancel", type: "close" }] },
           (id: string) => resolve(id === "ok"),
         );
       } catch {
@@ -68,6 +69,23 @@ export function tgConfirm(message: string): Promise<boolean> {
     });
   }
   return Promise.resolve(typeof window !== "undefined" ? window.confirm(message) : false);
+}
+
+/** Alert dialog — uses Telegram's native showAlert inside Telegram, window.alert in browser. */
+export function tgAlert(message: string): Promise<void> {
+  const t = tg();
+  if (t?.showAlert) {
+    return new Promise((resolve) => {
+      try {
+        t.showAlert!(message, () => resolve());
+      } catch {
+        if (typeof window !== "undefined") window.alert(message);
+        resolve();
+      }
+    });
+  }
+  if (typeof window !== "undefined") window.alert(message);
+  return Promise.resolve();
 }
 
 export async function copyText(text: string) {

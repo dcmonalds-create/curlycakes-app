@@ -4,7 +4,7 @@ import { useLocalState, uid } from "@/lib/storage";
 import type { CakeSize, Recipe, ShoppingList, Ingredient } from "@/lib/types";
 import { DEFAULT_SIZE_TABLE, findSizeForPeople, sortByDiameter, scaleByDiameter, BASE_DIAMETER } from "@/lib/sizes";
 import { QtyInput } from "@/components/QtyInput";
-import { tgConfirm } from "@/lib/telegram";
+import { tgConfirm, tgAlert } from "@/lib/telegram";
 
 export function Sizes() {
   const [table, setTable, hydrated] = useLocalState<CakeSize[]>("cc:sizes", DEFAULT_SIZE_TABLE);
@@ -116,7 +116,7 @@ function BuildList({
       onSave(lists.map((l) => (l.id === listId ? { ...l, cakes: [...l.cakes, ...cakes] } : l)));
     }
     setSelected(new Set());
-    alert(`✨ Added ${cakes.length} recipe${cakes.length !== 1 ? "s" : ""} scaled to ${target.diameter} cm.`);
+    tgAlert(`✨ Added ${cakes.length} recipe${cakes.length !== 1 ? "s" : ""} scaled to ${target.diameter} cm.`);
   }
 
   return (

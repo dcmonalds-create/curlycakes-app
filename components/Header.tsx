@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useSyncStatus, getSyncDiagnostics, type SyncDiagnostics } from "@/lib/storage";
+import { tgAlert } from "@/lib/telegram";
 import { useTheme } from "@/lib/theme";
 
 const LABEL: Record<string, { text: string; dot: string }> = {
@@ -28,7 +29,7 @@ export function Header({ title, subtitle }: { title: string; subtitle?: string }
   function copy() {
     if (!diag) return;
     navigator.clipboard?.writeText(JSON.stringify(diag, null, 2));
-    alert("Diagnostics copied.");
+    tgAlert("Diagnostics copied.");
   }
 
   // Show the icon of the theme you'd switch to (universal toggle pattern).

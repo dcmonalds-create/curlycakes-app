@@ -229,8 +229,10 @@ export function useLocalState<T>(key: string, initial: T) {
               if (!userModified.current) {
                 setValueRaw(cloudVal);
                 localStorage.setItem(key, normalized);
+                lastCloudSync.current = normalized; // mark as synced only when we actually applied it
               }
-              lastCloudSync.current = normalized; // mark as synced regardless
+              // If userModified: don't update lastCloudSync — let persist effect
+              // detect the difference and write the user's value to cloud.
             } catch {}
           } else if (local !== null && !userModified.current) {
             // Cloud is empty but we have local data — migrate it up.
@@ -273,6 +275,10 @@ export function useLocalState<T>(key: string, initial: T) {
         setStatus("error"); setGlobal("error", e);
       }
     }, 400);
+
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
   }, [key, value, hydrated]);
 
   const setValue = (next: T | ((prev: T) => T)) => {

@@ -7,7 +7,7 @@ import { PackEditor } from "@/components/PackEditor";
 import { QtyInput } from "@/components/QtyInput";
 import { parseQty } from "@/lib/qty";
 import { DEFAULT_SIZE_TABLE, sortByDiameter, multiplierFor, scaleByDiameter, BASE_DIAMETER } from "@/lib/sizes";
-import { tgConfirm } from "@/lib/telegram";
+import { tgConfirm, tgAlert } from "@/lib/telegram";
 
 const DEFAULT_CATEGORIES = ["Sponge", "Cream", "Frosting", "Decoration", "Dough", "Other"];
 
@@ -27,13 +27,10 @@ export function Recipes() {
     return extra.length ? [...base, ...extra] : base;
   }, [storedCategories, recipes]);
 
-  function addCategory(): string | null {
-    const raw = prompt("New category name")?.trim();
-    if (!raw) return null;
-    if (!orderedCategories.includes(raw)) {
-      setStoredCategories([...orderedCategories, raw]);
+  function addCategory(name: string): void {
+    if (name && !orderedCategories.includes(name)) {
+      setStoredCategories([...orderedCategories, name]);
     }
-    return raw;
   }
 
   const [filter, setFilter] = useState<string>("All");
@@ -88,7 +85,7 @@ export function Recipes() {
   ) {
     const ing = recipe.ingredients ?? [];
     if (ing.length === 0) {
-      alert("Add ingredients to this recipe first so the app can calculate quantities.");
+      tgAlert("Add ingredients to this recipe first so the app can calculate quantities.");
       return false;
     }
 
@@ -194,7 +191,7 @@ export function Recipes() {
               </button>
               <button
                 onClick={() => {
-                  if (!hasIngredients) { alert("Add ingredients to this recipe first."); return; }
+                  if (!hasIngredients) { tgAlert("Add ingredients to this recipe first."); return; }
                   setQuickAddId(r.id);
                 }}
                 className="shrink-0 grid place-items-center w-14 border-l border-line text-muted hover:text-ink active:bg-surface-2 transition"
@@ -213,8 +210,7 @@ export function Recipes() {
         <CategoryManager
           categories={orderedCategories}
           onCategories={(cats) => setStoredCategories(cats)}
-          recipes={recipes}
-          onRecipes={setRecipes}
+          onRecipes={(updater) => setRecipes(updater)}
           onClose={() => setShowCategoryManager(false)}
         />
       )}
@@ -237,7 +233,7 @@ export function Recipes() {
                 const ok = addToList(quickAddRecipe, opts, lid, ln);
                 if (ok) {
                   setQuickAddId(null);
-                  alert(`✨ Added "${quickAddRecipe.title}".`);
+                  tgAlert(`✨ Added "${quickAddRecipe.title}".`);
                 }
               }}
             />
@@ -274,7 +270,7 @@ function RecipeDetail({
     listId: string | "__new__",
     newListName?: string,
   ) => boolean;
-  onAddCategory: () => string | null;
+  onAddCategory: (name: string) => void;
   onUpsertProduct: (p: Product) => void;
   onRemoveProduct: (name: string) => void;
   categories: string[];
@@ -283,6 +279,7 @@ function RecipeDetail({
   const [draft, setDraft] = useState<{ name: string; qty: string; unit: Unit }>({ name: "", qty: "", unit: "g" });
   const [showAdder, setShowAdder] = useState<boolean>(false);
   const [packEditFor, setPackEditFor] = useState<string | null>(null);
+  const [newCatDraft, setNewCatDraft] = useState<string | null>(null);
 
   const productByName = (n: string) => products.find((p) => p.name === normalizeName(n));
 
@@ -319,21 +316,49 @@ function RecipeDetail({
           value={recipe.title}
           onChange={(e) => onChange({ ...recipe, title: e.target.value })}
         />
-        <select
-          className="input"
-          value={recipe.category}
-          onChange={(e) => {
-            if (e.target.value === "__new__") {
-              const c = onAddCategory();
-              if (c) onChange({ ...recipe, category: c });
-              return;
-            }
-            onChange({ ...recipe, category: e.target.value });
-          }}
-        >
-          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-          <option value="__new__">＋ New category…</option>
-        </select>
+        {newCatDraft === null ? (
+          <select
+            className="input"
+            value={recipe.category}
+            onChange={(e) => {
+              if (e.target.value === "__new__") { setNewCatDraft(""); return; }
+              onChange({ ...recipe, category: e.target.value });
+            }}
+          >
+            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+            <option value="__new__">＋ New category…</option>
+          </select>
+        ) : (
+          <div className="flex gap-2">
+            <input
+              className="input flex-1"
+              autoFocus
+              placeholder="New category name"
+              value={newCatDraft}
+              onChange={(e) => setNewCatDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newCatDraft.trim()) {
+                  onAddCategory(newCatDraft.trim());
+                  onChange({ ...recipe, category: newCatDraft.trim() });
+                  setNewCatDraft(null);
+                } else if (e.key === "Escape") {
+                  setNewCatDraft(null);
+                }
+              }}
+            />
+            <button
+              onClick={() => {
+                if (newCatDraft.trim()) {
+                  onAddCategory(newCatDraft.trim());
+                  onChange({ ...recipe, category: newCatDraft.trim() });
+                }
+                setNewCatDraft(null);
+              }}
+              className="btn-primary !px-3 !py-2 shrink-0"
+            >Add</button>
+            <button onClick={() => setNewCatDraft(null)} className="btn-ghost !px-3 !py-2 shrink-0">×</button>
+          </div>
+        )}
 
         <div className="flex gap-1 p-1 bg-surface-2 rounded-full">
           {(["cake", "other"] as const).map((k) => {
@@ -499,7 +524,7 @@ function RecipeDetail({
               const note = opts.mode === "cake"
                 ? `${opts.targetDiameter} cm${opts.multBy > 1 ? ` ×${opts.multBy}` : ""}`
                 : `×${opts.portions} portion${opts.portions > 1 ? "s" : ""}`;
-              alert(`✨ Added (${note}).`);
+              tgAlert(`✨ Added (${note}).`);
             }
           }}
         />
@@ -715,14 +740,12 @@ type CatEntry = { orig: string; name: string };
 function CategoryManager({
   categories,
   onCategories,
-  recipes,
   onRecipes,
   onClose,
 }: {
   categories: string[];
   onCategories: (c: string[]) => void;
-  recipes: Recipe[];
-  onRecipes: (r: Recipe[]) => void;
+  onRecipes: (updater: (prev: Recipe[]) => Recipe[]) => void;
   onClose: () => void;
 }) {
   const [entries, setEntries] = useState<CatEntry[]>(
@@ -751,29 +774,32 @@ function CategoryManager({
 
   function save() {
     const valid = entries.filter((e) => e.name.trim());
-    let updated = [...recipes];
+    const newNames = valid.map((e) => e.name.trim());
 
-    // Apply renames (orig → new name)
+    // Build rename map (original name → new name) for applying to recipes
+    const renameMap = new Map<string, string>();
     valid.forEach(({ orig, name }) => {
-      if (orig && orig !== name.trim()) {
-        updated = updated.map((r) =>
-          r.category === orig ? { ...r, category: name.trim() } : r
-        );
-      }
+      if (orig && orig !== name.trim()) renameMap.set(orig, name.trim());
     });
 
-    // Move deleted-category recipes to "Other"
+    // Categories that were deleted (in original list but not in survivors)
     const survivingOrigs = new Set(valid.map((e) => e.orig).filter(Boolean));
-    categories.forEach((c) => {
-      if (!survivingOrigs.has(c)) {
-        updated = updated.map((r) =>
-          r.category === c ? { ...r, category: "Other" } : r
-        );
-      }
+    const deletedOrigs = categories.filter((c) => !survivingOrigs.has(c));
+
+    // Fallback for recipes in deleted categories: first surviving category, or ""
+    const fallback = newNames[0] ?? "";
+
+    // Use functional update so we operate on the live recipes state, not a stale prop snapshot
+    onRecipes((currentRecipes) => {
+      return currentRecipes.map((r) => {
+        let cat = r.category;
+        if (renameMap.has(cat)) cat = renameMap.get(cat)!;
+        if (deletedOrigs.includes(cat)) cat = fallback;
+        return cat !== r.category ? { ...r, category: cat } : r;
+      });
     });
 
-    onRecipes(updated);
-    onCategories(valid.map((e) => e.name.trim()));
+    onCategories(newNames);
     onClose();
   }
 
