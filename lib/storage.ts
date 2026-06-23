@@ -195,6 +195,10 @@ export function useLocalState<T>(key: string, initial: T) {
   // The persist effect skips a write if value hasn't changed since the last sync,
   // preventing spurious SAVING→ERROR cycles triggered by the cloud read itself.
   const lastCloudSync = useRef<string | null>(null);
+  // Set to true the moment the user calls setValue(). If the cloud read arrives
+  // after the user has already made a change, we discard the cloud value so we
+  // don't overwrite the user's in-progress edit.
+  const userModified = useRef(false);
 
   // Load
   useEffect(() => {
@@ -220,11 +224,15 @@ export function useLocalState<T>(key: string, initial: T) {
             try {
               const cloudVal = JSON.parse(cloudRaw) as T;
               const normalized = JSON.stringify(cloudVal);
-              setValueRaw(cloudVal);
-              localStorage.setItem(key, normalized);
-              lastCloudSync.current = normalized; // already in sync — skip persist write
+              // Only apply cloud value if the user hasn't already made a local change.
+              // If they edited before the cloud responded, their edit wins.
+              if (!userModified.current) {
+                setValueRaw(cloudVal);
+                localStorage.setItem(key, normalized);
+              }
+              lastCloudSync.current = normalized; // mark as synced regardless
             } catch {}
-          } else if (local !== null) {
+          } else if (local !== null && !userModified.current) {
             // Cloud is empty but we have local data — migrate it up.
             const normalized = JSON.stringify(local);
             await cloudWrite(key, normalized);
@@ -267,7 +275,10 @@ export function useLocalState<T>(key: string, initial: T) {
     }, 400);
   }, [key, value, hydrated]);
 
-  const setValue = (next: T | ((prev: T) => T)) => setValueRaw(next as T);
+  const setValue = (next: T | ((prev: T) => T)) => {
+    userModified.current = true;
+    setValueRaw(next as T);
+  };
 
   return [value, setValue, hydrated, status] as const;
 }
