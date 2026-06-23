@@ -15,6 +15,25 @@ export function Recipes() {
   const [lists, setLists] = useLocalState<ShoppingList[]>("cc:lists", []);
   const [products, setProducts] = useLocalState<Product[]>("cc:products", []);
   const [sizes] = useLocalState<CakeSize[]>("cc:sizes", DEFAULT_SIZE_TABLE);
+  const [customCategories, setCustomCategories] = useLocalState<string[]>("cc:categories", []);
+
+  function addCategory(): string | null {
+    const raw = prompt("New category name")?.trim();
+    if (!raw) return null;
+    if (!customCategories.includes(raw) && !DEFAULT_CATEGORIES.includes(raw)) {
+      setCustomCategories([...customCategories, raw]);
+    }
+    return raw;
+  }
+  function deleteCategory(c: string) {
+    if (DEFAULT_CATEGORIES.includes(c)) {
+      alert("Built-in categories can't be deleted.");
+      return;
+    }
+    if (!confirm(`Delete category "${c}"? Recipes in it will move to "Other".`)) return;
+    setCustomCategories(customCategories.filter((x) => x !== c));
+    setRecipes(recipes.map((r) => (r.category === c ? { ...r, category: "Other" } : r)));
+  }
   const [filter, setFilter] = useState<string>("All");
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -27,8 +46,8 @@ export function Recipes() {
 
   const categories = useMemo(() => {
     const fromRecipes = recipes.map((r) => r.category).filter(Boolean);
-    return Array.from(new Set([...DEFAULT_CATEGORIES, ...fromRecipes]));
-  }, [recipes]);
+    return Array.from(new Set([...DEFAULT_CATEGORIES, ...customCategories, ...fromRecipes]));
+  }, [recipes, customCategories]);
 
   const visible = filter === "All" ? recipes : recipes.filter((r) => r.category === filter);
   const open = recipes.find((r) => r.id === openId) || null;
@@ -38,7 +57,11 @@ export function Recipes() {
   function addRecipe() {
     const title = prompt("Recipe title")?.trim();
     if (!title) return;
-    const category = prompt(`Category? (e.g. ${DEFAULT_CATEGORIES.join(", ")})`)?.trim() || "Other";
+    const known = [...DEFAULT_CATEGORIES, ...customCategories].join(", ");
+    const category = prompt(`Category? (existing: ${known}) — leave blank for "Other"`)?.trim() || "Other";
+    if (category && !DEFAULT_CATEGORIES.includes(category) && !customCategories.includes(category)) {
+      setCustomCategories([...customCategories, category]);
+    }
     const r: Recipe = {
       id: uid(), title, category, body: "", ingredients: [],
       kind: "cake", baseDiameter: BASE_DIAMETER, basePortions: 1,
@@ -122,6 +145,7 @@ export function Recipes() {
         onUpsertProduct={upsertProduct}
         onRemoveProduct={removeProduct}
         categories={categories}
+        onAddCategory={addCategory}
       />
     );
   }
@@ -130,18 +154,36 @@ export function Recipes() {
     <div className="px-5 space-y-4">
       <button onClick={addRecipe} className="btn-primary w-full">+ New recipe</button>
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {["All", ...categories].map((c) => (
-          <button
-            key={c}
-            onClick={() => setFilter(c)}
-            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition ${
-              filter === c ? "bg-accent text-bg" : "bg-surface text-muted border border-line"
-            }`}
-          >
-            {c}
-          </button>
-        ))}
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-5 px-5">
+        {["All", ...categories].map((c) => {
+          const isCustom = customCategories.includes(c);
+          return (
+            <span key={c} className="inline-flex shrink-0">
+              <button
+                onClick={() => setFilter(c)}
+                className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition ${
+                  filter === c ? "bg-accent text-bg" : "bg-surface text-muted border border-line"
+                } ${isCustom ? "rounded-r-none border-r-0" : ""}`}
+              >
+                {c}
+              </button>
+              {isCustom && (
+                <button
+                  onClick={() => deleteCategory(c)}
+                  className={`px-2 rounded-r-full text-xs font-semibold whitespace-nowrap transition ${
+                    filter === c ? "bg-accent text-bg" : "bg-surface text-subtle border border-line border-l-0"
+                  }`}
+                  title={`Delete category "${c}"`}
+                  aria-label={`Delete category ${c}`}
+                >×</button>
+              )}
+            </span>
+          );
+        })}
+        <button
+          onClick={() => addCategory()}
+          className="shrink-0 px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-surface text-ink border border-dashed border-line"
+        >＋ New</button>
       </div>
 
       {visible.length === 0 && (
@@ -226,6 +268,7 @@ function RecipeDetail({
   onUpsertProduct,
   onRemoveProduct,
   categories,
+  onAddCategory,
 }: {
   recipe: Recipe;
   lists: ShoppingList[];
@@ -239,6 +282,7 @@ function RecipeDetail({
     listId: string | "__new__",
     newListName?: string,
   ) => boolean;
+  onAddCategory: () => string | null;
   onUpsertProduct: (p: Product) => void;
   onRemoveProduct: (name: string) => void;
   categories: string[];
@@ -286,9 +330,17 @@ function RecipeDetail({
         <select
           className="input"
           value={recipe.category}
-          onChange={(e) => onChange({ ...recipe, category: e.target.value })}
+          onChange={(e) => {
+            if (e.target.value === "__new__") {
+              const c = onAddCategory();
+              if (c) onChange({ ...recipe, category: c });
+              return;
+            }
+            onChange({ ...recipe, category: e.target.value });
+          }}
         >
           {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+          <option value="__new__">＋ New category…</option>
         </select>
 
         <div className="flex gap-1 p-1 bg-surface-2 rounded-full">
