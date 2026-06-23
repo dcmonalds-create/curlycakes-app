@@ -434,9 +434,14 @@ function RecipeDetail({
       </div>
 
       {!showAdder ? (
-        <button onClick={() => setShowAdder(true)} className="btn-primary w-full">
-          🛒 Add to shopping list
-        </button>
+        <div className="flex gap-2">
+          <button onClick={onBack} className="btn-primary flex-1">
+            ✓ Save
+          </button>
+          <button onClick={() => setShowAdder(true)} className="btn-ghost flex-1">
+            🛒 Add to list
+          </button>
+        </div>
       ) : (
         <AddToListPanel
           recipe={recipe}
