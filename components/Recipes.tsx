@@ -748,7 +748,6 @@ function CategoryManager({
 
   function remove(idx: number) {
     const c = entries[idx];
-    if (DEFAULT_CATEGORIES.includes(c.orig)) return;
     if (c.orig && !confirm(`Delete "${c.orig}"? Recipes in it will move to "Other".`)) return;
     setEntries(entries.filter((_, i) => i !== idx));
   }
@@ -799,45 +798,36 @@ function CategoryManager({
           <button onClick={onClose} className="text-muted text-2xl leading-none px-1">×</button>
         </div>
 
-        <p className="text-xs text-muted">Tap a name to rename it. Use ▲▼ to reorder. 🔒 = built-in.</p>
+        <p className="text-xs text-muted">Tap a name to rename it. Use ▲▼ to reorder.</p>
 
         <ul className="space-y-2">
-          {entries.map((e, idx) => {
-            const isBuiltin = DEFAULT_CATEGORIES.includes(e.orig);
-            return (
-              <li key={idx} className="flex gap-1.5 items-center">
-                <div className="flex flex-col gap-0">
-                  <button
-                    onClick={() => move(idx, -1)}
-                    disabled={idx === 0}
-                    className="text-[10px] leading-none text-subtle disabled:opacity-20 px-1 py-0.5"
-                  >▲</button>
-                  <button
-                    onClick={() => move(idx, 1)}
-                    disabled={idx === entries.length - 1}
-                    className="text-[10px] leading-none text-subtle disabled:opacity-20 px-1 py-0.5"
-                  >▼</button>
-                </div>
-                <input
-                  className="input flex-1"
-                  value={e.name}
-                  readOnly={isBuiltin}
-                  placeholder="Category name"
-                  onChange={(ev) => rename(idx, ev.target.value)}
-                  style={isBuiltin ? { opacity: 0.55 } : undefined}
-                />
-                {isBuiltin ? (
-                  <span className="shrink-0 text-subtle text-base px-1" title="Built-in — cannot be deleted">🔒</span>
-                ) : (
-                  <button
-                    onClick={() => remove(idx)}
-                    className="shrink-0 text-subtle hover:text-ink text-xl px-1 leading-none"
-                    aria-label={`Delete ${e.name}`}
-                  >×</button>
-                )}
-              </li>
-            );
-          })}
+          {entries.map((e, idx) => (
+            <li key={idx} className="flex gap-1.5 items-center">
+              <div className="flex flex-col gap-0">
+                <button
+                  onClick={() => move(idx, -1)}
+                  disabled={idx === 0}
+                  className="text-[10px] leading-none text-subtle disabled:opacity-20 px-1 py-0.5"
+                >▲</button>
+                <button
+                  onClick={() => move(idx, 1)}
+                  disabled={idx === entries.length - 1}
+                  className="text-[10px] leading-none text-subtle disabled:opacity-20 px-1 py-0.5"
+                >▼</button>
+              </div>
+              <input
+                className="input flex-1"
+                value={e.name}
+                placeholder="Category name"
+                onChange={(ev) => rename(idx, ev.target.value)}
+              />
+              <button
+                onClick={() => remove(idx)}
+                className="shrink-0 text-subtle hover:text-ink text-xl px-1 leading-none"
+                aria-label={`Delete ${e.name}`}
+              >×</button>
+            </li>
+          ))}
         </ul>
 
         <button onClick={addNew} className="btn-ghost w-full text-sm">＋ Add category</button>
