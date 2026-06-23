@@ -191,6 +191,10 @@ export function useLocalState<T>(key: string, initial: T) {
   const [status, setStatus] = useState<SyncStatus>("idle");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const usingCloud = useRef<boolean>(false);
+  // Tracks the last JSON string written to OR read from cloud.
+  // The persist effect skips a write if value hasn't changed since the last sync,
+  // preventing spurious SAVING→ERROR cycles triggered by the cloud read itself.
+  const lastCloudSync = useRef<string | null>(null);
 
   // Load
   useEffect(() => {
@@ -215,12 +219,16 @@ export function useLocalState<T>(key: string, initial: T) {
           if (cloudRaw) {
             try {
               const cloudVal = JSON.parse(cloudRaw) as T;
+              const normalized = JSON.stringify(cloudVal);
               setValueRaw(cloudVal);
-              localStorage.setItem(key, cloudRaw);
+              localStorage.setItem(key, normalized);
+              lastCloudSync.current = normalized; // already in sync — skip persist write
             } catch {}
           } else if (local !== null) {
             // Cloud is empty but we have local data — migrate it up.
-            await cloudWrite(key, JSON.stringify(local));
+            const normalized = JSON.stringify(local);
+            await cloudWrite(key, normalized);
+            lastCloudSync.current = normalized;
           }
           setStatus("synced"); setGlobal("synced");
         } catch (e) {
@@ -242,11 +250,16 @@ export function useLocalState<T>(key: string, initial: T) {
 
     if (!usingCloud.current) return;
 
+    // Skip cloud write if the value hasn't changed since the last cloud read or write.
+    // This prevents the cloud-read on mount from immediately triggering a redundant save.
+    if (lastCloudSync.current === serialized) return;
+
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setStatus("saving"); setGlobal("saving");
     saveTimer.current = setTimeout(async () => {
       try {
         await cloudWrite(key, serialized);
+        lastCloudSync.current = serialized;
         setStatus("synced"); setGlobal("synced");
       } catch (e) {
         setStatus("error"); setGlobal("error", e);
