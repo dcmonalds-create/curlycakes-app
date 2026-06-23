@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useLocalState, uid } from "@/lib/storage";
 import { UNITS, type ShoppingList, type Unit, type Ingredient, type Product, type InventoryItem } from "@/lib/types";
 import { aggregate, buildShoppingMessage, normalizeName } from "@/lib/aggregate";
-import { shareViaTelegram, copyText } from "@/lib/telegram";
+import { shareViaTelegram, copyText, tgConfirm } from "@/lib/telegram";
 import { PackEditor } from "@/components/PackEditor";
 import { QtyInput } from "@/components/QtyInput";
 import { parseQty } from "@/lib/qty";
@@ -25,8 +25,8 @@ export function ShoppingLists() {
     setOpenListId(l.id);
   }
 
-  function deleteList(id: string) {
-    if (!confirm("Delete this list?")) return;
+  async function deleteList(id: string) {
+    if (!await tgConfirm("Delete this list?")) return;
     setLists(lists.filter((l) => l.id !== id));
     if (openListId === id) setOpenListId(null);
   }
@@ -129,8 +129,8 @@ function ListDetail({
     });
   }
 
-  function deleteCake(cakeId: string) {
-    if (!confirm("Remove this cake from the list?")) return;
+  async function deleteCake(cakeId: string) {
+    if (!await tgConfirm("Remove this cake from the list?")) return;
     onChange({ ...list, cakes: list.cakes.filter((c) => c.id !== cakeId) });
   }
 
@@ -171,12 +171,12 @@ function ListDetail({
     alert(ok ? "Copied to clipboard ✨" : "Couldn't copy");
   }
 
-  function doneBaking() {
+  async function doneBaking() {
     if (totals.length === 0) {
       alert("Nothing to deduct — your list is empty.");
       return;
     }
-    if (!confirm(`Mark "${list.name}" as baked? This will subtract ${totals.length} ingredient${totals.length !== 1 ? "s" : ""} from your pantry.`)) return;
+    if (!await tgConfirm(`Mark "${list.name}" as baked? This will subtract ${totals.length} ingredient${totals.length !== 1 ? "s" : ""} from your pantry.`)) return;
     const { inventory: nextInv, shortages } = deductFromInventory(
       inventory,
       totals.map((t) => ({ name: t.name, qty: t.qty, unit: t.unit })),

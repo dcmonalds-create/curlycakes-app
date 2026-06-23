@@ -7,6 +7,7 @@ import { PackEditor } from "@/components/PackEditor";
 import { QtyInput } from "@/components/QtyInput";
 import { parseQty } from "@/lib/qty";
 import { DEFAULT_SIZE_TABLE, sortByDiameter, multiplierFor, scaleByDiameter, BASE_DIAMETER } from "@/lib/sizes";
+import { tgConfirm } from "@/lib/telegram";
 
 const DEFAULT_CATEGORIES = ["Sponge", "Cream", "Frosting", "Decoration", "Dough", "Other"];
 
@@ -75,8 +76,8 @@ export function Recipes() {
     setRecipes(recipes.map((r) => (r.id === updated.id ? { ...updated, updatedAt: Date.now() } : r)));
   }
 
-  function remove(id: string) {
-    if (!confirm("Delete this recipe?")) return;
+  async function remove(id: string) {
+    if (!await tgConfirm("Delete this recipe?")) return;
     setRecipes(recipes.filter((r) => r.id !== id));
     if (openId === id) setOpenId(null);
   }
@@ -747,8 +748,6 @@ function CategoryManager({
   }
 
   function remove(idx: number) {
-    const c = entries[idx];
-    if (c.orig && !confirm(`Delete "${c.orig}"? Recipes in it will move to "Other".`)) return;
     setEntries(entries.filter((_, i) => i !== idx));
   }
 

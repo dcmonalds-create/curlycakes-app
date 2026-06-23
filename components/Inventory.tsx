@@ -5,6 +5,7 @@ import { UNITS, type InventoryItem, type Unit } from "@/lib/types";
 import { addToInventory } from "@/lib/inventory";
 import { QtyInput } from "@/components/QtyInput";
 import { parseQty } from "@/lib/qty";
+import { tgConfirm } from "@/lib/telegram";
 
 export function Inventory() {
   const [inv, setInv] = useLocalState<InventoryItem[]>("cc:inventory", []);
@@ -32,9 +33,9 @@ export function Inventory() {
   function removeItem(id: string) {
     setInv(inv.filter((i) => i.id !== id));
   }
-  function clearAll() {
+  async function clearAll() {
     if (!inv.length) return;
-    if (!confirm("Clear the entire pantry?")) return;
+    if (!await tgConfirm("Clear the entire pantry?")) return;
     setInv([]);
   }
 

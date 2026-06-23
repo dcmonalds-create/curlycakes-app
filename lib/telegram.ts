@@ -52,6 +52,24 @@ export async function shareViaTelegram(text: string): Promise<ShareResult> {
   return copied ? "browser-tab" : "browser-tab";
 }
 
+/** Confirmation dialog that works inside Telegram (uses showPopup) and in browser (falls back to window.confirm). */
+export function tgConfirm(message: string): Promise<boolean> {
+  const t = tg();
+  if (t?.showPopup) {
+    return new Promise((resolve) => {
+      try {
+        t.showPopup!(
+          { message, buttons: [{ id: "ok", type: "ok" }, { id: "cancel", type: "cancel" }] },
+          (id: string) => resolve(id === "ok"),
+        );
+      } catch {
+        resolve(typeof window !== "undefined" ? window.confirm(message) : false);
+      }
+    });
+  }
+  return Promise.resolve(typeof window !== "undefined" ? window.confirm(message) : false);
+}
+
 export async function copyText(text: string) {
   try {
     await navigator.clipboard.writeText(text);

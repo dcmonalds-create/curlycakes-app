@@ -4,6 +4,7 @@ import { useLocalState, uid } from "@/lib/storage";
 import type { CakeSize, Recipe, ShoppingList, Ingredient } from "@/lib/types";
 import { DEFAULT_SIZE_TABLE, findSizeForPeople, sortByDiameter, scaleByDiameter, BASE_DIAMETER } from "@/lib/sizes";
 import { QtyInput } from "@/components/QtyInput";
+import { tgConfirm } from "@/lib/telegram";
 
 export function Sizes() {
   const [table, setTable, hydrated] = useLocalState<CakeSize[]>("cc:sizes", DEFAULT_SIZE_TABLE);
@@ -227,8 +228,8 @@ function SizeTable({
   }
   function remove(id: string) { onChange(table.filter((r) => r.id !== id)); }
   function add()    { onChange([...table, { id: uid(), diameter: 0, people: 0, multiplier: 1 }]); }
-  function resetDefaults() {
-    if (confirm("Replace the table with the Street Kitchen defaults (18 cm = base)?")) onChange(DEFAULT_SIZE_TABLE);
+  async function resetDefaults() {
+    if (await tgConfirm("Replace the table with the Street Kitchen defaults (18 cm = base)?")) onChange(DEFAULT_SIZE_TABLE);
   }
 
   return (
