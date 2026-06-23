@@ -16,13 +16,12 @@ export function Recipes() {
   const [lists, setLists] = useLocalState<ShoppingList[]>("cc:lists", []);
   const [products, setProducts] = useLocalState<Product[]>("cc:products", []);
   const [sizes] = useLocalState<CakeSize[]>("cc:sizes", DEFAULT_SIZE_TABLE);
-  const [storedCategories, setStoredCategories] = useLocalState<string[]>("cc:categories", []);
+  // null = never explicitly saved → fall back to defaults.
+  // [] = user explicitly cleared all categories → show nothing.
+  const [storedCategories, setStoredCategories] = useLocalState<string[] | null>("cc:categories", null);
 
-  // Full ordered list: migrate old format (custom-only) by prepending built-ins
   const orderedCategories = useMemo(() => {
-    if (storedCategories.length === 0) return DEFAULT_CATEGORIES;
-    const hasSome = DEFAULT_CATEGORIES.some((c) => storedCategories.includes(c));
-    const base = hasSome ? storedCategories : [...DEFAULT_CATEGORIES, ...storedCategories];
+    const base = storedCategories ?? DEFAULT_CATEGORIES;
     // Append any recipe categories not yet tracked
     const extra = recipes.map((r) => r.category).filter((c) => c && !base.includes(c));
     return extra.length ? [...base, ...extra] : base;
@@ -56,15 +55,10 @@ export function Recipes() {
   const quickAddRecipe = recipes.find((r) => r.id === quickAddId) || null;
 
   function addRecipe() {
-    const title = prompt("Recipe title")?.trim();
-    if (!title) return;
-    const known = orderedCategories.join(", ");
-    const category = prompt(`Category? (existing: ${known}) — leave blank for "Other"`)?.trim() || "Other";
-    if (category && !orderedCategories.includes(category)) {
-      setStoredCategories([...orderedCategories, category]);
-    }
     const r: Recipe = {
-      id: uid(), title, category, body: "", ingredients: [],
+      id: uid(), title: "New Recipe",
+      category: orderedCategories[0] ?? "Other",
+      body: "", ingredients: [],
       kind: "cake", baseDiameter: BASE_DIAMETER, basePortions: 1,
       updatedAt: Date.now(),
     };
@@ -218,7 +212,7 @@ export function Recipes() {
       {showCategoryManager && (
         <CategoryManager
           categories={orderedCategories}
-          onCategories={setStoredCategories}
+          onCategories={(cats) => setStoredCategories(cats)}
           recipes={recipes}
           onRecipes={setRecipes}
           onClose={() => setShowCategoryManager(false)}

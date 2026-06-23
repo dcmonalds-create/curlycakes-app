@@ -18,9 +18,7 @@ export function ShoppingLists() {
   const openList = lists.find((l) => l.id === openListId) || null;
 
   function addList() {
-    const name = prompt("Shopping list name (e.g. 'Saturday orders')")?.trim();
-    if (!name) return;
-    const l: ShoppingList = { id: uid(), name, createdAt: Date.now(), cakes: [] };
+    const l: ShoppingList = { id: uid(), name: "New list", createdAt: Date.now(), cakes: [] };
     setLists([l, ...lists]);
     setOpenListId(l.id);
   }
@@ -117,9 +115,7 @@ function ListDetail({
   const [showTotals, setShowTotals] = useState(true);
 
   function addCake() {
-    const name = prompt("Cake name (e.g. 'Strawberry vanilla')")?.trim();
-    if (!name) return;
-    onChange({ ...list, cakes: [...list.cakes, { id: uid(), name, ingredients: [] }] });
+    onChange({ ...list, cakes: [...list.cakes, { id: uid(), name: "New cake", ingredients: [] }] });
   }
 
   function updateCake(cakeId: string, patch: Partial<{ name: string; ingredients: Ingredient[] }>) {
