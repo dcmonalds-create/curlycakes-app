@@ -24,6 +24,14 @@ export interface ShoppingList {
   checked?: string[];
 }
 
+export interface InventoryItem {
+  id: string;
+  name: string;       // canonical display name
+  qty: number;        // current stock
+  unit: Unit;
+  updatedAt: number;
+}
+
 export interface CakeSize {
   id: string;
   diameter: number;     // cm — the tin diameter

@@ -1,16 +1,18 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useLocalState, uid } from "@/lib/storage";
-import { UNITS, type ShoppingList, type Unit, type Ingredient, type Product } from "@/lib/types";
+import { UNITS, type ShoppingList, type Unit, type Ingredient, type Product, type InventoryItem } from "@/lib/types";
 import { aggregate, buildShoppingMessage, normalizeName } from "@/lib/aggregate";
 import { shareViaTelegram, copyText } from "@/lib/telegram";
 import { PackEditor } from "@/components/PackEditor";
 import { QtyInput } from "@/components/QtyInput";
 import { parseQty } from "@/lib/qty";
+import { deductFromInventory } from "@/lib/inventory";
 
 export function ShoppingLists() {
   const [lists, setLists] = useLocalState<ShoppingList[]>("cc:lists", []);
   const [products, setProducts] = useLocalState<Product[]>("cc:products", []);
+  const [inventory, setInventory] = useLocalState<InventoryItem[]>("cc:inventory", []);
   const [openListId, setOpenListId] = useState<string | null>(null);
 
   const openList = lists.find((l) => l.id === openListId) || null;
@@ -46,6 +48,8 @@ export function ShoppingLists() {
       <ListDetail
         list={openList}
         products={products}
+        inventory={inventory}
+        setInventory={setInventory}
         onBack={() => setOpenListId(null)}
         onChange={updateList}
         onDelete={() => deleteList(openList.id)}
@@ -92,6 +96,8 @@ export function ShoppingLists() {
 function ListDetail({
   list,
   products,
+  inventory,
+  setInventory,
   onBack,
   onChange,
   onDelete,
@@ -100,6 +106,8 @@ function ListDetail({
 }: {
   list: ShoppingList;
   products: Product[];
+  inventory: InventoryItem[];
+  setInventory: (next: InventoryItem[]) => void;
   onBack: () => void;
   onChange: (l: ShoppingList) => void;
   onDelete: () => void;
@@ -161,6 +169,25 @@ function ListDetail({
   async function copy() {
     const ok = await copyText(buildShoppingMessage(list.name, list.cakes, products));
     alert(ok ? "Copied to clipboard ✨" : "Couldn't copy");
+  }
+
+  function doneBaking() {
+    if (totals.length === 0) {
+      alert("Nothing to deduct — your list is empty.");
+      return;
+    }
+    if (!confirm(`Mark "${list.name}" as baked? This will subtract ${totals.length} ingredient${totals.length !== 1 ? "s" : ""} from your pantry.`)) return;
+    const { inventory: nextInv, shortages } = deductFromInventory(
+      inventory,
+      totals.map((t) => ({ name: t.name, qty: t.qty, unit: t.unit })),
+    );
+    setInventory(nextInv);
+    if (shortages.length > 0) {
+      const list = shortages.map((s) => `  • ${s.name}: ${s.missing} ${s.unit} short`).join("\n");
+      alert(`Done ✓ — but you didn't have enough of:\n${list}`);
+    } else {
+      alert("Done ✓ — pantry updated.");
+    }
   }
 
   return (
@@ -266,6 +293,9 @@ function ListDetail({
             <button onClick={share} className="btn-primary flex-1">Send to Telegram</button>
             <button onClick={copy} className="btn-ghost">Copy</button>
           </div>
+          <button onClick={doneBaking} className="btn-ghost w-full text-sm">
+            ✓ Done baking — deduct from pantry
+          </button>
         </div>
       )}
     </div>

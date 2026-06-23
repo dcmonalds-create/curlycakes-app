@@ -5,6 +5,7 @@ import { Tabs, type TabKey } from "@/components/Tabs";
 import { ShoppingLists } from "@/components/ShoppingLists";
 import { Recipes } from "@/components/Recipes";
 import { Sizes } from "@/components/Sizes";
+import { Inventory } from "@/components/Inventory";
 import { tg } from "@/lib/telegram";
 import { useKeyboardAvoidance } from "@/lib/theme";
 
@@ -20,7 +21,8 @@ export default function Page() {
   const subtitle =
     tab === "lists"   ? "One list, every cake, exact totals." :
     tab === "recipes" ? "Your recipes — categorised & portioned." :
-                        "How many people? I'll tell you the size.";
+    tab === "sizes"   ? "How many people? I'll tell you the size." :
+                        "What's in your pantry right now.";
 
   return (
     <div>
@@ -28,7 +30,10 @@ export default function Page() {
       <div className="px-5 mt-2 mb-4 rise rise-3">
         <div className="divider" />
       </div>
-      {tab === "lists" ? <ShoppingLists /> : tab === "recipes" ? <Recipes /> : <Sizes />}
+      {tab === "lists"   ? <ShoppingLists /> :
+       tab === "recipes" ? <Recipes /> :
+       tab === "sizes"   ? <Sizes /> :
+                           <Inventory />}
       <Tabs tab={tab} onChange={setTab} />
     </div>
   );
