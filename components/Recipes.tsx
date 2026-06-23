@@ -15,27 +15,30 @@ export function Recipes() {
   const [lists, setLists] = useLocalState<ShoppingList[]>("cc:lists", []);
   const [products, setProducts] = useLocalState<Product[]>("cc:products", []);
   const [sizes] = useLocalState<CakeSize[]>("cc:sizes", DEFAULT_SIZE_TABLE);
-  const [customCategories, setCustomCategories] = useLocalState<string[]>("cc:categories", []);
+  const [storedCategories, setStoredCategories] = useLocalState<string[]>("cc:categories", []);
+
+  // Full ordered list: migrate old format (custom-only) by prepending built-ins
+  const orderedCategories = useMemo(() => {
+    if (storedCategories.length === 0) return DEFAULT_CATEGORIES;
+    const hasSome = DEFAULT_CATEGORIES.some((c) => storedCategories.includes(c));
+    const base = hasSome ? storedCategories : [...DEFAULT_CATEGORIES, ...storedCategories];
+    // Append any recipe categories not yet tracked
+    const extra = recipes.map((r) => r.category).filter((c) => c && !base.includes(c));
+    return extra.length ? [...base, ...extra] : base;
+  }, [storedCategories, recipes]);
 
   function addCategory(): string | null {
     const raw = prompt("New category name")?.trim();
     if (!raw) return null;
-    if (!customCategories.includes(raw) && !DEFAULT_CATEGORIES.includes(raw)) {
-      setCustomCategories([...customCategories, raw]);
+    if (!orderedCategories.includes(raw)) {
+      setStoredCategories([...orderedCategories, raw]);
     }
     return raw;
   }
-  function deleteCategory(c: string) {
-    if (DEFAULT_CATEGORIES.includes(c)) {
-      alert("Built-in categories can't be deleted.");
-      return;
-    }
-    if (!confirm(`Delete category "${c}"? Recipes in it will move to "Other".`)) return;
-    setCustomCategories(customCategories.filter((x) => x !== c));
-    setRecipes(recipes.map((r) => (r.category === c ? { ...r, category: "Other" } : r)));
-  }
+
   const [filter, setFilter] = useState<string>("All");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
 
   function upsertProduct(p: Product) {
     setProducts([...products.filter((x) => x.name !== p.name), p]);
@@ -44,10 +47,7 @@ export function Recipes() {
     setProducts(products.filter((p) => p.name !== name));
   }
 
-  const categories = useMemo(() => {
-    const fromRecipes = recipes.map((r) => r.category).filter(Boolean);
-    return Array.from(new Set([...DEFAULT_CATEGORIES, ...customCategories, ...fromRecipes]));
-  }, [recipes, customCategories]);
+  const categories = orderedCategories;
 
   const visible = filter === "All" ? recipes : recipes.filter((r) => r.category === filter);
   const open = recipes.find((r) => r.id === openId) || null;
@@ -57,10 +57,10 @@ export function Recipes() {
   function addRecipe() {
     const title = prompt("Recipe title")?.trim();
     if (!title) return;
-    const known = [...DEFAULT_CATEGORIES, ...customCategories].join(", ");
+    const known = orderedCategories.join(", ");
     const category = prompt(`Category? (existing: ${known}) — leave blank for "Other"`)?.trim() || "Other";
-    if (category && !DEFAULT_CATEGORIES.includes(category) && !customCategories.includes(category)) {
-      setCustomCategories([...customCategories, category]);
+    if (category && !orderedCategories.includes(category)) {
+      setStoredCategories([...orderedCategories, category]);
     }
     const r: Recipe = {
       id: uid(), title, category, body: "", ingredients: [],
@@ -155,35 +155,22 @@ export function Recipes() {
       <button onClick={addRecipe} className="btn-primary w-full">+ New recipe</button>
 
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-5 px-5">
-        {["All", ...categories].map((c) => {
-          const isCustom = customCategories.includes(c);
-          return (
-            <span key={c} className="inline-flex shrink-0">
-              <button
-                onClick={() => setFilter(c)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition ${
-                  filter === c ? "bg-accent text-bg" : "bg-surface text-muted border border-line"
-                } ${isCustom ? "rounded-r-none border-r-0" : ""}`}
-              >
-                {c}
-              </button>
-              {isCustom && (
-                <button
-                  onClick={() => deleteCategory(c)}
-                  className={`px-2 rounded-r-full text-xs font-semibold whitespace-nowrap transition ${
-                    filter === c ? "bg-accent text-bg" : "bg-surface text-subtle border border-line border-l-0"
-                  }`}
-                  title={`Delete category "${c}"`}
-                  aria-label={`Delete category ${c}`}
-                >×</button>
-              )}
-            </span>
-          );
-        })}
+        {["All", ...categories].map((c) => (
+          <button
+            key={c}
+            onClick={() => setFilter(c)}
+            className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition ${
+              filter === c ? "bg-accent text-bg" : "bg-surface text-muted border border-line"
+            }`}
+          >
+            {c}
+          </button>
+        ))}
         <button
-          onClick={() => addCategory()}
+          onClick={() => setShowCategoryManager(true)}
           className="shrink-0 px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-surface text-ink border border-dashed border-line"
-        >＋ New</button>
+          title="Manage categories"
+        >⚙ Manage</button>
       </div>
 
       {visible.length === 0 && (
@@ -226,6 +213,16 @@ export function Recipes() {
           );
         })}
       </div>
+
+      {showCategoryManager && (
+        <CategoryManager
+          categories={orderedCategories}
+          onCategories={setStoredCategories}
+          recipes={recipes}
+          onRecipes={setRecipes}
+          onClose={() => setShowCategoryManager(false)}
+        />
+      )}
 
       {quickAddRecipe && (
         <div
@@ -713,6 +710,142 @@ function AddToListPanel({
             : `Add ×${portions} portion${portions > 1 ? "s" : ""}`}
         </button>
         <button onClick={onCancel} className="btn-ghost">Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+type CatEntry = { orig: string; name: string };
+
+function CategoryManager({
+  categories,
+  onCategories,
+  recipes,
+  onRecipes,
+  onClose,
+}: {
+  categories: string[];
+  onCategories: (c: string[]) => void;
+  recipes: Recipe[];
+  onRecipes: (r: Recipe[]) => void;
+  onClose: () => void;
+}) {
+  const [entries, setEntries] = useState<CatEntry[]>(
+    categories.map((c) => ({ orig: c, name: c }))
+  );
+
+  function move(idx: number, dir: -1 | 1) {
+    const next = [...entries];
+    const target = idx + dir;
+    if (target < 0 || target >= next.length) return;
+    [next[idx], next[target]] = [next[target], next[idx]];
+    setEntries(next);
+  }
+
+  function rename(idx: number, val: string) {
+    setEntries(entries.map((e, i) => (i === idx ? { ...e, name: val } : e)));
+  }
+
+  function remove(idx: number) {
+    const c = entries[idx];
+    if (DEFAULT_CATEGORIES.includes(c.orig)) return;
+    if (c.orig && !confirm(`Delete "${c.orig}"? Recipes in it will move to "Other".`)) return;
+    setEntries(entries.filter((_, i) => i !== idx));
+  }
+
+  function addNew() {
+    setEntries([...entries, { orig: "", name: "" }]);
+  }
+
+  function save() {
+    const valid = entries.filter((e) => e.name.trim());
+    let updated = [...recipes];
+
+    // Apply renames (orig → new name)
+    valid.forEach(({ orig, name }) => {
+      if (orig && orig !== name.trim()) {
+        updated = updated.map((r) =>
+          r.category === orig ? { ...r, category: name.trim() } : r
+        );
+      }
+    });
+
+    // Move deleted-category recipes to "Other"
+    const survivingOrigs = new Set(valid.map((e) => e.orig).filter(Boolean));
+    categories.forEach((c) => {
+      if (!survivingOrigs.has(c)) {
+        updated = updated.map((r) =>
+          r.category === c ? { ...r, category: "Other" } : r
+        );
+      }
+    });
+
+    onRecipes(updated);
+    onCategories(valid.map((e) => e.name.trim()));
+    onClose();
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-sm p-3 flex items-end sm:items-center justify-center"
+      onClick={onClose}
+    >
+      <div
+        className="card max-w-md w-full mx-auto space-y-3 max-h-[80vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center">
+          <h3 className="font-display text-lg text-ink">Manage categories</h3>
+          <button onClick={onClose} className="text-muted text-2xl leading-none px-1">×</button>
+        </div>
+
+        <p className="text-xs text-muted">Tap a name to rename it. Use ▲▼ to reorder. 🔒 = built-in.</p>
+
+        <ul className="space-y-2">
+          {entries.map((e, idx) => {
+            const isBuiltin = DEFAULT_CATEGORIES.includes(e.orig);
+            return (
+              <li key={idx} className="flex gap-1.5 items-center">
+                <div className="flex flex-col gap-0">
+                  <button
+                    onClick={() => move(idx, -1)}
+                    disabled={idx === 0}
+                    className="text-[10px] leading-none text-subtle disabled:opacity-20 px-1 py-0.5"
+                  >▲</button>
+                  <button
+                    onClick={() => move(idx, 1)}
+                    disabled={idx === entries.length - 1}
+                    className="text-[10px] leading-none text-subtle disabled:opacity-20 px-1 py-0.5"
+                  >▼</button>
+                </div>
+                <input
+                  className="input flex-1"
+                  value={e.name}
+                  readOnly={isBuiltin}
+                  placeholder="Category name"
+                  onChange={(ev) => rename(idx, ev.target.value)}
+                  style={isBuiltin ? { opacity: 0.55 } : undefined}
+                />
+                {isBuiltin ? (
+                  <span className="shrink-0 text-subtle text-base px-1" title="Built-in — cannot be deleted">🔒</span>
+                ) : (
+                  <button
+                    onClick={() => remove(idx)}
+                    className="shrink-0 text-subtle hover:text-ink text-xl px-1 leading-none"
+                    aria-label={`Delete ${e.name}`}
+                  >×</button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+
+        <button onClick={addNew} className="btn-ghost w-full text-sm">＋ Add category</button>
+
+        <div className="flex gap-2 pt-1 border-t border-line">
+          <button onClick={save} className="btn-primary flex-1">Save</button>
+          <button onClick={onClose} className="btn-ghost">Cancel</button>
+        </div>
       </div>
     </div>
   );
